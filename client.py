@@ -1,0 +1,314 @@
+from collections import namedtuple
+
+from django.conf import settings
+from django.utils.html import strip_tags
+from django.utils.http import urlencode
+import requests
+
+from doaj import schemas
+from doaj.data_structs import(
+    AdminStruct,
+    AuthorStruct,
+    BaseStruct,
+    BibjsonStruct,
+    IdentifierStruct,
+    JournalStruct,
+    LicenseStruct,
+    LinkStruct,
+)
+
+
+JOURNAL_SLOTS = (
+        # Admin
+        "application_status", "contact", "current_journal", "owner",
+        # Bibjson
+        "allows_full_text_indexing", "alternative_title","license", "link",
+        "keywords", "language", "identifier", "article_statistics",
+        "plagiarism_detection", "provider", "publisher", "subject",
+        "title",
+        # Record Metadata
+
+        "created_date", "id", "last_updated"
+)
+
+class BaseDOAJClient(object):
+    """ A base client for CRUD operations via the DOAJ API"""
+    API_URL = "https://doaj.org/api/v1{operation}"
+    OP_PATH = ""
+    SCHEMA = None
+    VERBS = set()
+
+    def __init__(self, api_token, codec=None, *args, **kwargs):
+        self.api_token = api_token
+        self._codec = codec or self.SCHEMA()
+        super().__init__(*args, **kwargs)
+
+    def __iter__(self):
+        for field in self.__slots__:
+            yield getattr(self, field, None)
+
+    def __eq__(self, other):
+        return all(
+            this_val == other_val
+            for this_val, other_val in zip(self, other)
+        )
+
+    def _get(self, querystring=None, **path_vars):
+        if "GET" in self.VERBS:
+            url = self._build_url(querystring, **path_vars)
+            return self._fetch(url, requests.get)
+        else:
+            raise NotImplementedError("%s does not support GET requests")
+
+    def _put(self, querystring=None, headers=None, **path_vars):
+        if "PUT" in self.VERBS:
+            url = self._build_url(querystring, **path_vars)
+            if headers is None:
+                headers = {}
+            headers = {'Content-type': 'application/json'}.update(headers)
+            return self._fetch(requests.put, body=self.encode, headers=headers)
+        else:
+            raise NotImplementedError("%s does not support PUT requests")
+
+    def _post(self, querystring=None, headers=None, **path_vars):
+        if "POST" in self.VERBS:
+            url = self._build_url(querystring, **path_vars)
+            if headers is None:
+                headers = {}
+            headers = {'Content-type': 'application/json'}.update(headers)
+            return self._fetch(requests.put, body=self.encode, headers=headers)
+        else:
+            raise NotImplementedError("%s does not support POST requests")
+
+    def _delete(self):
+        raise NotImplementedError("%s does not support DELETE requests")
+
+    def _fetch(self, url, method, body=None, headers=None):
+        response = method(url)
+        import pdb;pdb.set_trace()
+        if self._validate_response(response):
+            self._decode(response.text)
+
+    def _build_url(self, querystring, **path_args):
+        url = self.API_URL.format(operation=self.OP_PATH.format(**path_args))
+        if querystring:
+            url += "?%s" % querystring
+        return url
+
+    def encode(self):
+        return self._codec.dumps(self)
+
+    def _decode(self, encoded):
+        decoded = self._codec.loads(encoded)
+        for key, value in decoded.items():
+            setattr(self, key, value)
+
+    def _validate_response(self, response):
+        """ Validates the status code of the response
+
+        If the status code is not success (2[x][x]) it raises
+        an HttpError
+        :param response: An HttpResponse
+        :returns bool: True
+        """
+        # Check for 2xx status code
+        if response.ok:
+            return True
+        else:
+            response.raise_for_status()
+
+
+class DOAJArticle(BaseDOAJClient):
+    OP_PATH = "/articles/{article_id}"
+    SCHEMA = schemas.ArticleSchema
+    VERBS = {"GET", "POST", "PUT"}
+
+    __slots__ = [
+        # Admin
+        "in_doaj", "publisher_record_id", "upload_id", "seal",
+        # Bibjson
+        "abstract", "title", "year", "month", "author", "journal",
+        "keywords", "link", "persistent_identifier_scheme", "subject",
+        # Record Metadata
+        "created_date", "id", "last_updated"
+    ]
+
+    @property
+    def admin(self):
+        return AdminStruct(
+            *(getattr(self, field, None) for field in AdminStruct.__slots__))
+
+    @property
+    def bibjson(self):
+        return BibjsonStruct(
+            *(getattr(self, field, None) for field in BibjsonStruct.__slots__))
+
+    @admin.setter
+    def admin(self, admin_struct):
+        for field in admin_struct.__slots__:
+            setattr(self, field, getattr(admin_struct, field, None))
+
+    @bibjson.setter
+    def bibjson(self, bibjson_struct):
+        for field in bibjson_struct.__slots__:
+            setattr(self, field, getattr(bibjson_struct, field, None))
+
+    @classmethod
+    def from_article_model(cls, article):
+        token = settings.DOAJ_API_TOKEN
+        doaj_article = cls(token)
+        doaj_article.abstract = strip_tags(article.abstract)
+        doaj_article.title = strip_tags(article.title)
+        doaj_article.year = int(article.date_published.year)
+        doaj_article.month = int(article.date_published.month)
+        doaj_article.author = [
+            cls.transform_author(a) for a in article.authors.all()]
+        doaj_article.journal = cls.transform_journal(article)
+        doaj_article.keywords = [kw.word for kw in article.keywords.all()]
+        doaj_article.link = cls.transform_urls(article)
+        doaj_article.identifier = cls.transform_identifiers(article)
+
+        return doaj_article
+
+    @classmethod
+    def from_doaj_id(cls, doaj_id):
+        token = settings.DOAJ_API_TOKEN
+        doaj_article = cls(token)
+        doaj_article.id = doaj_id
+        doaj_article.load()
+        return doaj_article
+
+    def load(self):
+        querystring = urlencode({"api_key": self.api_token})
+        self._get(querystring, article_id=self.id)
+
+    def create(self):
+        pass
+
+    @staticmethod
+    def transform_author(author):
+        return AuthorStruct(
+            name=author.full_name(),
+            affiliation=author.affiliation(),
+        )
+
+    @staticmethod
+    def transform_urls(article):
+        links = []
+        if article.url:
+            links.append(LinkStruct(
+                content_type="text/html",
+                type="fulltext",
+                url=article.url,
+            ))
+        if article.pdfs:
+            links.append(LinkStruct(
+                content_type="application/pdf",
+                type="fulltext",
+                url=article.pdf_url,
+            ))
+
+        return links
+
+    @classmethod
+    def transform_journal(cls, article):
+        return JournalStruct(
+            language=[settings.LANGUAGE_CODE],
+            license=cls.transform_license(article),
+            number=str(article.issue.issue) if article.issue else None,
+            volume=str(article.issue.volume) if article.issue else None,
+            title=article.journal.name,
+            publisher=article.journal.publisher,
+        )
+
+    @staticmethod
+    def transform_license(article):
+        license = []
+        if article.license:
+            license.append(LicenseStruct(
+                open_access=True,
+                title=article.license.name,
+                url=article.license.url
+            ))
+        return license
+
+    @staticmethod
+    def transform_identifiers(article):
+        identifiers = []
+        identifiers.append(
+            IdentifierStruct(
+                type="eissn",
+                id=article.journal.issn,
+            )
+        )
+        if article.get_doi:
+            identifiers.append(
+                IdentifierStruct(
+                    type="doi",
+                    id=article.get_doi(),
+                )
+            )
+        return identifiers
+
+
+class BaseSearchClient(BaseDOAJClient):
+    OP_PATH = "/search/{search_type}/{search_query}"
+    SEARCH_TYPE = ""
+    SEARCH_QUERY_PREFIX = ""
+    SCHEMA = schemas.SearchSchema
+    VERBS= {"GET"}
+
+    __slots__ = "results"
+
+    def search(self, search_term):
+        if self.SEARCH_QUERY_PREFIX:
+            search_query = "%s:%s" % (self.SEARCH_QUERY_PREFIX, search_term)
+        else:
+            search_query = search_term
+        self._get(search_query=search_query, search_type=self.SEARCH_TYPE)
+        return self
+
+
+class ApplicationSearchClient(BaseSearchClient):
+    SEARCH_TYPE = "applications"
+    SEARCH_QUERY_PREFIX = "issn"
+
+
+class ArticleSearchClient(BaseSearchClient):
+    """ Can search articles by DOI"""
+    SEARCH_TYPE = "articles"
+    SEARCH_QUERY_PREFIX = "doi"
+
+    def one(self):
+        if len(self.results) > 1:
+            raise MultipleResultsFound("Found %d!" % len(self.results))
+        elif len(self.results) < 1:
+            raise ResultNotFound("Search returned zero results")
+        else:
+            return self.results[0]
+
+
+class ApplicationClient(BaseDOAJClient):
+    OP_PATH = "/applications/{application_id}"
+#    SCHEMA = schemas.ApplicationSchema
+
+    __slots__ = JOURNAL_SLOTS
+
+
+class ArticleBulkClient(BaseDOAJClient):
+    OP_PATH = "/bulk/articles"
+
+    def delete(self):
+        pass
+
+    def update(self):
+        pass
+
+
+class MultipleResultsFound(Exception):
+    pass
+
+
+class ResultNotFound(Exception):
+    pass
+
