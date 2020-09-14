@@ -1,12 +1,12 @@
 from marshmallow import Schema, fields, post_load, EXCLUDE
 
-from doaj import data_structs
+from doaj_transporter import data_structs
 
 class StructSchema(Schema):
     _STRUCT_CLS = None
 
     @post_load
-    def populate_struct(self, data, *args, **kwargs):
+    def load_struct(self, data, *args, **kwargs):
         if self._STRUCT_CLS:
             return self._STRUCT_CLS(**data)
         return data

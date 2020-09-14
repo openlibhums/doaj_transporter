@@ -1,3 +1,4 @@
+import datetime
 import os
 from unittest import mock
 
@@ -10,10 +11,10 @@ from journal.models import Journal, Issue
 from press.models import Press
 from submission.models import Article, FrozenAuthor, Licence
 from submission.models import FrozenAuthor
-from utils.testing.helpers import create_user
+from utils.testing import helpers
 from utils import install
 
-from doaj.client import DOAJArticle, ArticleSearchClient
+from doaj_transporter.client import DOAJArticle, ArticleSearchClient
 
 
 class MockResponse(mock.Mock):
@@ -32,23 +33,32 @@ class MockResponse(mock.Mock):
 
 class TestDOAJArticleClient(TestCase):
     def setUp(self):
-        press = Press.objects.create()
-        self.journal = Journal(code="doaj", domain="doaj")
+        press = helpers.create_press()
+        self.journal, _ = helpers.create_journals()
         self.journal.save()
         call_command('load_default_settings', management_command=False)
         self.journal.publisher = "doaj"
+        self.journal.code = "doaj"
         self.journal.save()
 
         install.update_license(self.journal, management_command=False)
 
-        self.article = self._create_article()
+        self.article = self._create_article(
+            date_published=datetime.date(day=1, month=7,year=2019))
         self.encoded_article = """
         {
+        "admin": {
+            "publisher_record_id": null
+        },
         "bibjson":{
             "identifier":[
                 {
                     "id":"0000-0000",
                     "type":"eissn"
+                },
+                {
+                    "id": null,
+                    "type": "doi"
                 }
             ],
             "author":[
@@ -67,7 +77,7 @@ class TestDOAJArticleClient(TestCase):
                     }
                 ],
                 "publisher":"doaj",
-                "title":"Janeway JS",
+                "title":"Journal One",
                 "number":"1",
                 "language":[
                     "en"
@@ -78,10 +88,11 @@ class TestDOAJArticleClient(TestCase):
             ],
             "year":2019,
             "month":7,
+            "subject": null,
             "title":"The art of writing test titles",
             "link":[
                 {
-                    "url":"http://www.example.com/doaj/article/id/1/",
+                    "url":"http://localhost/doaj/article/id/%s/",
                     "content_type":"text/html",
                     "type":"fulltext"
                 }
@@ -89,7 +100,7 @@ class TestDOAJArticleClient(TestCase):
             "abstract":"The test abstract"
             }
         }
-        """
+        """ % (self.article.pk)
 
     def _create_article(self, **kwargs):
         kwargs.setdefault("abstract", "The test abstract")
@@ -99,7 +110,7 @@ class TestDOAJArticleClient(TestCase):
         article = Article(**kwargs)
         article.save()
 
-        author = create_user("author@doaj.com")
+        author = helpers.create_user("author@doaj.com")
         author.first_name = "Testla"
         author.last_name = "Musketeer"
         author.institution = "OLH"
@@ -140,7 +151,6 @@ class TestDOAJArticleClient(TestCase):
     def test_client_from_article_model(self):
         article = self.article
         doaj_article = DOAJArticle.from_article_model(article)
-        print(doaj_article.link)
 
         self.assertEqual(article.title, doaj_article.title)
 
@@ -148,10 +158,7 @@ class TestDOAJArticleClient(TestCase):
     def test_encode_article(self):
         doaj_article = DOAJArticle.from_article_model(self.article)
         result = doaj_article.encode()
-        import json;print(json.loads(self.encoded_article))
         self.maxDiff = None
-        print(json.loads(result))
-        raise Exception
         self.assertJSONEqual(result, self.encoded_article)
 
     @override_settings(DOAJ_API_TOKEN="dummy_key")
