@@ -5,8 +5,9 @@ from django.utils.html import strip_tags
 from django.utils.http import urlencode
 import requests
 
-from doaj import schemas
-from doaj.data_structs import(
+from doaj_transporter import plugin_settings
+from doaj_transporter import schemas
+from doaj_transporter.data_structs import(
     AdminStruct,
     AuthorStruct,
     BaseStruct,
@@ -17,6 +18,9 @@ from doaj.data_structs import(
     LinkStruct,
 )
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 JOURNAL_SLOTS = (
         # Admin
@@ -52,6 +56,14 @@ class BaseDOAJClient(object):
             this_val == other_val
             for this_val, other_val in zip(self, other)
         )
+    def __repr__(self):
+        kwargs = tuple(
+            "{}={}".format(slot,val) for slot, val in zip(self.__slots__, self)
+        )
+        return "{}{}".format(self.__class__.__name__, kwargs)
+
+    def __str__(self):
+        return repr(self)
 
     def _get(self, querystring=None, **path_vars):
         if "GET" in self.VERBS:
@@ -85,8 +97,9 @@ class BaseDOAJClient(object):
 
     def _fetch(self, url, method, body=None, headers=None):
         response = method(url)
-        import pdb;pdb.set_trace()
         if self._validate_response(response):
+            if settings.DEBUG:
+                logger.debug(response.text)
             self._decode(response.text)
 
     def _build_url(self, querystring, **path_args):
@@ -155,7 +168,7 @@ class DOAJArticle(BaseDOAJClient):
 
     @classmethod
     def from_article_model(cls, article):
-        token = settings.DOAJ_API_TOKEN
+        token = plugin_settings.DOAJ_API_TOKEN
         doaj_article = cls(token)
         doaj_article.abstract = strip_tags(article.abstract)
         doaj_article.title = strip_tags(article.title)
@@ -172,7 +185,7 @@ class DOAJArticle(BaseDOAJClient):
 
     @classmethod
     def from_doaj_id(cls, doaj_id):
-        token = settings.DOAJ_API_TOKEN
+        token = plugin_settings.DOAJ_API_TOKEN
         doaj_article = cls(token)
         doaj_article.id = doaj_id
         doaj_article.load()
@@ -266,7 +279,7 @@ class BaseSearchClient(BaseDOAJClient):
         else:
             search_query = search_term
         self._get(search_query=search_query, search_type=self.SEARCH_TYPE)
-        return self
+        return self.results
 
 
 class ApplicationSearchClient(BaseSearchClient):

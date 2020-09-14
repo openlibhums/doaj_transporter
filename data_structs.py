@@ -9,10 +9,31 @@ class BaseStruct():
                 setattr(self, key, value)
 
     def __eq__(self, other):
-        return all(
-            getattr(self, field, None) == getattr(other, field, None)
-            for field in self.__slots__
-        )
+        try:
+            return all(
+                getattr(self, field, None) == getattr(other, field, None)
+                for field in self.__slots__
+            )
+        except AttributeError:
+            raise TypeError(
+                "Can't compare objects of tupe {} and {}"
+                "".format(self.__class__.__name__, other.__class__.__name__)
+            )
+
+    def __repr__(self):
+        kwargs = []
+        for slot in self.__slots__:
+            try:
+                val = getattr(self, slot)
+            except AttributeError:
+                val = None
+            kwargs.append("{}={}".format(slot, val))
+        return "{}{}".format(self.__class__.__name__, tuple(kwargs))
+
+    def __str__(self):
+        return repr(self)
+
+
 
 
 class AuthorStruct(BaseStruct):
