@@ -8,3 +8,6 @@ class DOAJArticle(models.Model):
     exported = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
 
+    class Meta:
+        unique_together = ("article", "doaj_id")
+
