@@ -8,8 +8,6 @@ from identifiers.models import DOI_RE
 import requests
 from utils.logger import get_logger
 
-from doaj_transporter import plugin_settings
-from doaj_transporter import schemas
 from doaj_transporter.data_structs import(
     AdminStruct,
     AuthorStruct,
@@ -20,6 +18,9 @@ from doaj_transporter.data_structs import(
     LicenseStruct,
     LinkStruct,
 )
+from doaj_transporter import exceptions
+from doaj_transporter import plugin_settings
+from doaj_transporter import schemas
 
 
 logger = get_logger(__name__)
@@ -272,7 +273,8 @@ class BaseSearchClient(BaseDOAJClient):
     SEARCH_QUERY_PREFIX = ""
     SCHEMA = schemas.SearchSchema
     VERBS= {"GET"}
-    THROTTLE_SECS = 0.150
+    THROTTLE_SECS = 0.250
+    PAGE_SIZE = 50
 
     __slots__ = ["results", "next", "previous", "last"]
 
@@ -283,7 +285,8 @@ class BaseSearchClient(BaseDOAJClient):
             search_query = "%s:%s" % (self.SEARCH_QUERY_PREFIX, search_term)
         else:
             search_query = search_term
-        querystring = urlencode({"api_key": self.api_token})
+        querystring = urlencode(
+            {"api_key": self.api_token, "pageSize":self.PAGE_SIZE})
         self._get(
             querystring=querystring,
             search_query=search_query,
@@ -292,7 +295,7 @@ class BaseSearchClient(BaseDOAJClient):
         return iter(self)
 
     def _turn_page(self):
-        if self.next and self.total / self.page >= self.pageSize:
+        if hasattr(self, "next") and self.total / self.page >= self.pageSize:
             logger.debug("Thread sleeping for %ss" % self.THROTTLE_SECS)
             time.sleep(self.THROTTLE_SECS)
             self._fetch(self.next, requests.get)
@@ -332,17 +335,30 @@ class ArticleSearchClient(BaseSearchClient):
 
     def one(self):
         if len(self.results) > 1:
-            raise MultipleResultsFound("Found %d!" % len(self.results))
+            raise exceptions.MultipleResultsFound(
+                "Found %d!" % len(self.results))
         elif len(self.results) < 1:
-            raise ResultNotFound("Search returned zero results")
+            raise exceptions.ResultNotFound(
+                "Search returned zero results")
         else:
             return self.results[0]
 
-    def search_by_doi(self, doi):
+    def search_by_doi(self, doi, exact=False):
         match = DOI_RE.match(doi)
         if not match:
             raise ValueError("%s is not a valid doi" % doi)
-        return self.search(match)
+        if exact:
+            prefix="doi.exact"
+        else:
+            prefix="doi"
+        return self.search(match, prefix=prefix)
+
+    def search_by_publisher(self, publisher, exact=False):
+        if exact:
+            prefix="publisher.exact"
+        else:
+            prefix="publisher"
+        return self.search(publisher, prefix=prefix)
 
 
 class ApplicationClient(BaseDOAJClient):
@@ -360,12 +376,3 @@ class ArticleBulkClient(BaseDOAJClient):
 
     def update(self):
         pass
-
-
-class MultipleResultsFound(Exception):
-    pass
-
-
-class ResultNotFound(Exception):
-    pass
-
