@@ -14,7 +14,7 @@ from submission.models import FrozenAuthor
 from utils.testing import helpers
 from utils import install
 
-from doaj_transporter.client import DOAJArticle, ArticleSearchClient
+from doaj_transporter.clients import DOAJArticle, ArticleSearchClient
 
 
 class MockResponse(mock.Mock):
@@ -197,7 +197,7 @@ class TestArticleSearch(TestCase):
         }"""
         mock_response = MockResponse(response_data)
         mock_requests = mock.MagicMock(return_value=mock_response)
-        with mock.patch("doaj.client.requests", mock_requests):
+        with mock.patch("doaj_transporter.clients.requests", mock_requests):
             client = ArticleSearchClient()
             client.search("10.001/mock.01")
             self.assertTrue(client.one().in_doaj)
