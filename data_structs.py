@@ -76,10 +76,22 @@ class BibjsonStruct(BaseStruct):
         "link", "author", "subject", "start_page",
         "end_page",
 ]
+    @property
+    def doi(self):
+        if self.identifier:
+            for i in self.identifier:
+                if i.type == "doi":
+                    return i.id
+        return None
 
 
 class ArticleSearchResultStruct(BaseStruct):
     __slots__ = ["admin", "bibjson", "id", "created_date", "last_updated"]
+
+    @property
+    def doi(self):
+        if self.bibjson:
+            return self.bibjson.doi
 
 
 class SearchResultStruct(BaseStruct):
