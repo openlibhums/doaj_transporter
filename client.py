@@ -291,14 +291,21 @@ class BaseSearchClient(BaseDOAJClient):
         )
         return iter(self)
 
-    def __iter__(self):
-        for result in self.results:
-            yield result
-        # Chain results from next pages
+    def _turn_page(self):
         if self.next and self.total / self.page >= self.pageSize:
             logger.debug("Thread sleeping for %ss" % self.THROTTLE_SECS)
             time.sleep(self.THROTTLE_SECS)
             self._fetch(self.next, requests.get)
+            return True
+        else:
+            return False
+
+    def __iter__(self):
+        for result in self.results:
+            yield result
+        # Chain results from next pages
+        turned = self._turn_page()
+        if turned:
             for result in self:
                 yield result
 
