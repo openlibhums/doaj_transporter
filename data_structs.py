@@ -79,7 +79,7 @@ class BibjsonStruct(BaseStruct):
 
 
 class ArticleSearchResultStruct(BaseStruct):
-    __slots__ = ["bibjson", "id", "created_date", "last_updated"]
+    __slots__ = ["admin", "bibjson", "id", "created_date", "last_updated"]
 
 
 class SearchResultStruct(BaseStruct):

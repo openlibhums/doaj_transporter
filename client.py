@@ -1,4 +1,5 @@
 from collections import namedtuple
+import time
 
 from django.conf import settings
 from django.utils.html import strip_tags
@@ -271,6 +272,7 @@ class BaseSearchClient(BaseDOAJClient):
     SEARCH_QUERY_PREFIX = ""
     SCHEMA = schemas.SearchSchema
     VERBS= {"GET"}
+    THROTTLE_SECS = 0.150
 
     __slots__ = ["results", "next", "previous", "last"]
 
@@ -294,6 +296,8 @@ class BaseSearchClient(BaseDOAJClient):
             yield result
         # Chain results from next pages
         if self.next and self.total / self.page >= self.pageSize:
+            logger.debug("Thread sleeping for %ss" % self.THROTTLE_SECS)
+            time.sleep(self.THROTTLE_SECS)
             self._fetch(self.next, requests.get)
             for result in self:
                 yield result

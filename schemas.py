@@ -97,8 +97,16 @@ class ArticleSchema(Schema):
 
 
 class ArticleSearchResultSchema(StructSchema):
+    """ Schema for article  objects from a search result
+
+    The admin object on search results is slightly different
+    in that it doesn't return some of the fields (I suspect
+    its because this endpoint is meant to be public) The
+    rest is the same as ArticleSchema
+    """
     _STRUCT_CLS = data_structs.ArticleSearchResultStruct
 
+    admin = fields.Nested(AdminSchema)
     bibjson = fields.Nested(BibjsonSchema)
     created_date = fields.DateTime(format="iso", load_only=True)
     id = fields.String(load_only=True)
@@ -130,4 +138,4 @@ class SearchSchema(Schema):
     pageSize = fields.Int(required=True)
 
 class ArticleSearchSchema(SearchSchema):
-    results = fields.List(fields.Nested(ArticleSchema))
+    results = fields.List(fields.Nested(ArticleSearchResultSchema))

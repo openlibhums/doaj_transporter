@@ -8,7 +8,7 @@ SHORT_NAME = 'DOAJ'
 DISPLAY_NAME = 'DOAJ'
 MANAGER_URL = 'doaj_index'
 
-DOAJ_API_KEY = ""
+DOAJ_API_TOKEN = ""
 
 
 def install():
