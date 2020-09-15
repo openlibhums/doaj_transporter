@@ -49,6 +49,7 @@ class JournalStruct(BaseStruct):
         "language", "license", "number",
         "title", "volume", "publisher",
         "start_page", "end_page", "country",
+        "issns",
     ]
 
 
@@ -72,8 +73,13 @@ class BibjsonStruct(BaseStruct):
     __slots__ = [
         "abstract", "title", "year", "month",
         "identifier", "journal", "keywords",
-        "link", "author", "subject",
+        "link", "author", "subject", "start_page",
+        "end_page",
 ]
+
+
+class ArticleSearchResultStruct(BaseStruct):
+    __slots__ = ["bibjson", "id", "created_date", "last_updated"]
 
 
 class SearchResultStruct(BaseStruct):

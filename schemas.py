@@ -32,6 +32,7 @@ class JournalSchema(StructSchema):
     title = fields.String(required=True)
     start_page = fields.String()
     end_page = fields.String()
+    issns = fields.List(fields.String())
 
 
 class IdentifierSchema(StructSchema):
@@ -66,13 +67,15 @@ class BibjsonSchema(StructSchema):
     abstract = fields.String()
     author = fields.List(fields.Nested(AuthorSchema))
     title = fields.String()
-    year = fields.Int()
-    month = fields.Int()
+    year = fields.Str()
+    month = fields.Str()
     identifier = fields.List(fields.Nested(IdentifierSchema))
     journal = fields.Nested(JournalSchema)
     keywords = fields.List(fields.String)
     link = fields.List(fields.Nested(LinkSchema))
     subject = fields.List(fields.Nested(SubjectSchema))
+    start_page = fields.String()
+    end_page = fields.String()
 
 
 class AdminSchema(StructSchema):
@@ -85,11 +88,22 @@ class AdminSchema(StructSchema):
 
 
 class ArticleSchema(Schema):
+
     admin = fields.Nested(AdminSchema)
     bibjson = fields.Nested(BibjsonSchema)
     created_date = fields.DateTime(format="iso", load_only=True)
     id = fields.String(load_only=True)
     last_updated = fields.DateTime(format="iso", load_only=True)
+
+
+class ArticleSearchResultSchema(StructSchema):
+    _STRUCT_CLS = data_structs.ArticleSearchResultStruct
+
+    bibjson = fields.Nested(BibjsonSchema)
+    created_date = fields.DateTime(format="iso", load_only=True)
+    id = fields.String(load_only=True)
+    last_updated = fields.DateTime(format="iso", load_only=True)
+
 
 class SearchResultSchema(StructSchema):
     class Meta:
@@ -107,5 +121,13 @@ class SearchSchema(Schema):
         unknown = EXCLUDE
 
     results = fields.List(fields.Nested(SearchResultSchema))
+    next = fields.URL(default=None)
+    previous = fields.URL(default=None)
+    last = fields.URL()
+    first = fields.URL(default=None)
+    total = fields.Int(required=True)
+    page = fields.Int(required=True)
+    pageSize = fields.Int(required=True)
 
-
+class ArticleSearchSchema(SearchSchema):
+    results = fields.List(fields.Nested(ArticleSchema))

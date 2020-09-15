@@ -3,7 +3,9 @@ from collections import namedtuple
 from django.conf import settings
 from django.utils.html import strip_tags
 from django.utils.http import urlencode
+from identifiers.models import DOI_RE
 import requests
+from utils.logger import get_logger
 
 from doaj_transporter import plugin_settings
 from doaj_transporter import schemas
@@ -18,7 +20,6 @@ from doaj_transporter.data_structs import(
     LinkStruct,
 )
 
-from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -271,15 +272,41 @@ class BaseSearchClient(BaseDOAJClient):
     SCHEMA = schemas.SearchSchema
     VERBS= {"GET"}
 
-    __slots__ = "results"
+    __slots__ = ["results", "next", "previous", "last"]
 
-    def search(self, search_term):
-        if self.SEARCH_QUERY_PREFIX:
+    def search(self, search_term, prefix=None):
+        if prefix:
+            search_query = "%s:%s" % (prefix, search_term)
+        elif self.SEARCH_QUERY_PREFIX:
             search_query = "%s:%s" % (self.SEARCH_QUERY_PREFIX, search_term)
         else:
             search_query = search_term
-        self._get(search_query=search_query, search_type=self.SEARCH_TYPE)
-        return self.results
+        querystring = urlencode({"api_key": self.api_token})
+        self._get(
+            querystring=querystring,
+            search_query=search_query,
+            search_type=self.SEARCH_TYPE,
+        )
+        return iter(self)
+
+    def __iter__(self):
+        for result in self.results:
+            yield result
+        # Chain results from next pages
+        if self.next and self.total / self.page >= self.pageSize:
+            self._fetch(self.next, requests.get)
+            for result in self:
+                yield result
+
+    def __repr__(self):
+        try:
+            return "{}({})".format(
+                self.__class__.__name__,
+                "total={},page={},pageSize={}".format(
+                    self.total, self.page, self.pageSize),
+            )
+        except AttributeError:
+            return "{}()".format(self.__class__.__name__)
 
 
 class ApplicationSearchClient(BaseSearchClient):
@@ -290,7 +317,7 @@ class ApplicationSearchClient(BaseSearchClient):
 class ArticleSearchClient(BaseSearchClient):
     """ Can search articles by DOI"""
     SEARCH_TYPE = "articles"
-    SEARCH_QUERY_PREFIX = "doi"
+    SCHEMA = schemas.ArticleSearchSchema
 
     def one(self):
         if len(self.results) > 1:
@@ -299,6 +326,12 @@ class ArticleSearchClient(BaseSearchClient):
             raise ResultNotFound("Search returned zero results")
         else:
             return self.results[0]
+
+    def search_by_doi(self, doi):
+        match = DOI_RE.match(doi)
+        if not match:
+            raise ValueError("%s is not a valid doi" % doi)
+        return self.search(match)
 
 
 class ApplicationClient(BaseDOAJClient):
