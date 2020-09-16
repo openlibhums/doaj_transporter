@@ -1,5 +1,6 @@
 from collections import namedtuple
 import time
+import threading
 
 from django.conf import settings
 from django.utils.html import strip_tags
@@ -24,6 +25,17 @@ from doaj_transporter import schemas
 
 
 logger = get_logger(__name__)
+_local = threading.local()
+
+
+def session():
+    """Lazily loads and returns a requests session for this thread"""
+    try:
+        return _local.session
+    except AttributeError:
+        _local.session = requests.session()
+        return session()
+
 
 JOURNAL_SLOTS = (
         # Admin
@@ -71,7 +83,7 @@ class BaseDOAJClient(object):
     def _get(self, querystring=None, **path_vars):
         if "GET" in self.VERBS:
             url = self._build_url(querystring, **path_vars)
-            return self._fetch(url, requests.get)
+            return self._fetch(url, session().get)
         else:
             raise NotImplementedError("%s does not support GET requests")
 
@@ -81,7 +93,7 @@ class BaseDOAJClient(object):
             if headers is None:
                 headers = {}
             headers = {'Content-type': 'application/json'}.update(headers)
-            return self._fetch(requests.put, body=self.encode, headers=headers)
+            return self._fetch(_local.session.put, body=self.encode, headers=headers)
         else:
             raise NotImplementedError("%s does not support PUT requests")
 
@@ -91,7 +103,7 @@ class BaseDOAJClient(object):
             if headers is None:
                 headers = {}
             headers = {'Content-type': 'application/json'}.update(headers)
-            return self._fetch(requests.put, body=self.encode, headers=headers)
+            return self._fetch(session().post, body=self.encode, headers=headers)
         else:
             raise NotImplementedError("%s does not support POST requests")
 
@@ -99,10 +111,9 @@ class BaseDOAJClient(object):
         raise NotImplementedError("%s does not support DELETE requests")
 
     def _fetch(self, url, method, body=None, headers=None):
+        logger.info("Fetching %s", url)
         response = method(url)
         if self._validate_response(response):
-            if settings.DEBUG:
-                logger.debug(response.text)
             self._decode(response.text)
 
     def _build_url(self, querystring, **path_args):
@@ -296,9 +307,9 @@ class BaseSearchClient(BaseDOAJClient):
 
     def _turn_page(self):
         if hasattr(self, "next") and self.total / self.page >= self.pageSize:
-            logger.debug("Thread sleeping for %ss" % self.THROTTLE_SECS)
+            logger.info("Thread sleeping for %ss" % self.THROTTLE_SECS)
             time.sleep(self.THROTTLE_SECS)
-            self._fetch(self.next, requests.get)
+            self._fetch(self.next, session().get)
             return True
         else:
             return False
@@ -351,7 +362,7 @@ class ArticleSearchClient(BaseSearchClient):
             prefix="doi.exact"
         else:
             prefix="doi"
-        return self.search(match, prefix=prefix)
+        return self.search(match.string, prefix=prefix)
 
     def search_by_publisher(self, publisher, exact=False):
         if exact:

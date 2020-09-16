@@ -81,13 +81,16 @@ def synch_all_from_janeway(journal=None, push=False):
     else:
         journals = journal_models.Journal.objects.all()
     for journal in journals:
-        for article in journal.articles:
-            if article.doi:
+        for article in journal.article_set.filter(stage="Published"):
+            doi = article.get_doi()
+            if doi:
                 obj, c = synch_article_from_janeway(article)
                 if push and obj:
                     pass # TODO update DOAJ record
                 elif push and not obj:
                     pass #TODO Create DOAJ record
+                logger.info("Thread Sleeping for 50ms")
+                time.sleep(0.05)
 
 
 def synch_article_from_janeway(article):
@@ -95,21 +98,20 @@ def synch_article_from_janeway(article):
     :param article: an instance of janeway.models.Article
     :return: A tuple with the local record and bool flagging its creation
     """
+    doi = article.get_doi()
     api_token = plugin_settings.DOAJ_API_TOKEN
     created = obj = None
     try:
         models.DOAJArticle.objects.get(article=article)
     except models.DOAJArticle.DoesNotExist:
         search_client = clients.ArticleSearchClient(api_token)
-        result = search_client.search_by_doi(article.doi)
+        results = search_client.search_by_doi(doi)
         try:
-            obj, created = models.DOAJArticle.get_or_create(
+            doaj_id = next(results).id
+            obj, created = models.DOAJArticle.objects.get_or_create(
                 article=article,
-                doaj_id=result.one().id
+                doaj_id=doaj_id,
             )
-        except exceptions.ResultNotfound:
+        except StopIteration:
             logger.info("Article %s is not on DOAJ", article.pk)
-        except exceptions.MultipleResultsFound:
-            logger.warning(
-                "Multiple articles found in DOAJ with doi %s", article.doi)
     return obj, created
