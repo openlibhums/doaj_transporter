@@ -1,4 +1,3 @@
-from collections import namedtuple
 import time
 import threading
 
@@ -9,10 +8,9 @@ from identifiers.models import DOI_RE
 import requests
 from utils.logger import get_logger
 
-from doaj_transporter.data_structs import(
+from doaj_transporter.data_structs import (
     AdminStruct,
     AuthorStruct,
-    BaseStruct,
     BibjsonStruct,
     IdentifierStruct,
     JournalStruct,
@@ -41,7 +39,7 @@ JOURNAL_SLOTS = (
         # Admin
         "application_status", "contact", "current_journal", "owner",
         # Bibjson
-        "allows_full_text_indexing", "alternative_title","license", "link",
+        "allows_full_text_indexing", "alternative_title", "license", "link",
         "keywords", "language", "identifier", "article_statistics",
         "plagiarism_detection", "provider", "publisher", "subject",
         "title",
@@ -73,9 +71,11 @@ class BaseDOAJClient(object):
             this_val == other_val
             for this_val, other_val in zip(self, other)
         )
+
     def __repr__(self):
         kwargs = tuple(
-            "{}={}".format(slot,val) for slot, val in zip(self.__slots__, self)
+            "{}={}".format(slot, val)
+            for slot, val in zip(self.__slots__, self)
         )
         return "{}{}".format(self.__class__.__name__, kwargs)
 
@@ -187,6 +187,10 @@ class DOAJArticle(BaseDOAJClient):
 
     @classmethod
     def from_article_model(cls, article):
+        """Loads a DOAJ Article from a Janeway Article
+        :param article: An Instance of submission.models.Article
+        :return: An instance of this class
+        """
         token = plugin_settings.DOAJ_API_TOKEN
         doaj_article = cls(token)
         doaj_article.abstract = strip_tags(article.abstract)
