@@ -2,6 +2,7 @@ import time
 import threading
 
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.html import strip_tags
 from django.utils.http import urlencode
 from identifiers.models import DOI_RE
@@ -107,12 +108,23 @@ class BaseDOAJClient(object):
             if headers is None:
                 headers = {}
             headers = {'Content-type': 'application/json'}.update(headers)
-            return self._fetch(session().post, body=self.encode, headers=headers)
+            return self._fetch(
+                url, session().post, body=self.encode(), headers=headers)
         else:
             raise NotImplementedError("%s does not support POST requests")
 
-    def _delete(self):
-        raise NotImplementedError("%s does not support DELETE requests")
+    def _delete(self, querystring=None, headers=None, **path_vars):
+        if "DELETE" in self.VERBS:
+            url = self._build_url(querystring, **path_vars)
+            if headers is None:
+                headers = {}
+            headers = {'Content-type': 'application/json'}.update(headers)
+            return self._fetch(
+                url, session().delete, body=self.encode(),
+                headers=headers, decode=False,
+            )
+        else:
+            raise NotImplementedError("%s does not support DELETE requests")
 
     def _fetch(self, url, method, body=None, headers=None, decode=True):
         logger.info("Fetching %s", url)
@@ -126,6 +138,8 @@ class BaseDOAJClient(object):
             api_version=self.API_VERSION,
             operation=self.OP_PATH.format(**path_args),
         )
+        if url.endswith("/"):
+            url = url[:-1]
         if querystring:
             url += "?%s" % querystring
         return url
@@ -156,7 +170,7 @@ class BaseDOAJClient(object):
 class DOAJArticle(BaseDOAJClient):
     OP_PATH = "/articles/{article_id}"
     SCHEMA = schemas.ArticleSchema
-    VERBS = {"GET", "POST", "PUT"}
+    VERBS = {"GET", "POST", "PUT", "DELETE"}
 
     __slots__ = [
         # Admin
@@ -206,6 +220,11 @@ class DOAJArticle(BaseDOAJClient):
         doaj_article.keywords = [kw.word for kw in article.keywords.all()]
         doaj_article.link = cls.transform_urls(article)
         doaj_article.identifier = cls.transform_identifiers(article)
+        try:
+            doaj_article.id = article.doajarticle.doaj_id
+        except ObjectDoesNotExist:
+            doaj_article.id = None
+
 
         return doaj_article
 
@@ -221,8 +240,20 @@ class DOAJArticle(BaseDOAJClient):
         querystring = urlencode({"api_key": self.api_token})
         self._get(querystring, article_id=self.id)
 
-    def create(self):
-        pass
+    def upsert(self):
+        querystring = urlencode({"api_key": self.api_token})
+        if self.id:
+            self._put(querystring, article_id=self.id)
+        else:
+            self._post(querystring, article_id='')
+
+    def delete(self):
+        if not self.id:
+            raise ValueError(
+                "Record has no DOAJ id, it can't be deleted: %s" % self)
+        querystring = urlencode({"api_key": self.api_token})
+        self._delete(querystring, article_id=self.id)
+
 
     @staticmethod
     def transform_author(author):
