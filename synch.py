@@ -73,7 +73,7 @@ def synch_all_from_janeway(journal=None, push=False):
     """ Downloads DOAJ records for articles existing in the Janeway install
     Articles are looked up by DOI
     :param journal: an instance of janeway.models.Journal
-    :param push (bool): Whether or not to push missign records to DOAJ
+    :param push (bool): Whether or not to push missing records to DOAJ
     :return: A list of article PKs of those articles that have been synched
     """
     if journal:
@@ -85,12 +85,10 @@ def synch_all_from_janeway(journal=None, push=False):
             doi = article.get_doi()
             if doi:
                 obj, c = synch_article_from_janeway(article)
-                if push and obj:
-                    pass # TODO update DOAJ record
-                elif push and not obj:
-                    pass #TODO Create DOAJ record
-                logger.info("Thread Sleeping for 50ms")
-                time.sleep(0.05)
+                if push:
+                    logic.push_article_to_doaj(article)
+                logger.info("Thread Sleeping for 250ms")
+                time.sleep(0.25)
 
 
 def synch_article_from_janeway(article):
@@ -112,6 +110,9 @@ def synch_article_from_janeway(article):
                 article=article,
                 doaj_id=doaj_id,
             )
+            if created:
+                logger.info("New DOAJ record for article %s ", article.pk)
+
         except StopIteration:
             logger.info("Article %s is not on DOAJ", article.pk)
     return obj, created
