@@ -50,9 +50,11 @@ JOURNAL_SLOTS = (
         "created_date", "id", "last_updated"
 )
 
+
 class BaseDOAJClient(object):
     """ A base client for CRUD operations via the DOAJ API"""
-    API_URL = "https://doaj.org/api/v1{operation}"
+    API_URL = "https://doaj.org/api/{api_version}{operation}"
+    API_VERSION = "v1"
     OP_PATH = ""
     SCHEMA = None
     VERBS = set()
@@ -117,7 +119,10 @@ class BaseDOAJClient(object):
             self._decode(response.text)
 
     def _build_url(self, querystring, **path_args):
-        url = self.API_URL.format(operation=self.OP_PATH.format(**path_args))
+        url = self.API_URL.format(
+            api_version=self.API_VERSION,
+            operation=self.OP_PATH.format(**path_args),
+        )
         if querystring:
             url += "?%s" % querystring
         return url
