@@ -230,11 +230,26 @@ class DOAJArticle(BaseDOAJClient):
 
     @classmethod
     def from_doaj_id(cls, doaj_id):
+        """Loads a remote DOAJ Article from the given  doaj_id
+        :param doaj_id: str
+        :return: An instance of this class
+        """
         token = plugin_settings.DOAJ_API_TOKEN
         doaj_article = cls(token)
         doaj_article.id = doaj_id
         doaj_article.load()
         return doaj_article
+
+    @classmethod
+    def from_doaj_record(cls, doaj_record):
+        """Loads a DOAJ Article from a Janeway DOAJ Article record
+
+        Wraps from_article_model to load a DOAJArticle that had been
+        previously synched.
+        :param doaj_record: An Instance of models.DOAJArticle
+        :return: An instance of this class
+        """
+        return cls.from_article_model(doaj_record.article)
 
     def load(self):
         querystring = urlencode({"api_key": self.api_token})
