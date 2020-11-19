@@ -94,6 +94,8 @@ class ArticleSchema(Schema):
     created_date = fields.DateTime(format="iso", load_only=True)
     id = fields.String(load_only=True)
     last_updated = fields.DateTime(format="iso", load_only=True)
+    status = fields.String(load_only=True)
+    location=fields.String(load_only=True)
 
 
 class ArticleSearchResultSchema(StructSchema):
