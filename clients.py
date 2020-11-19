@@ -95,9 +95,11 @@ class BaseDOAJClient(object):
             if headers is None:
                 headers = {}
             headers = {'Content-type': 'application/json'}.update(headers)
-            return self._fetch(_local.session.put, body=self.encode, headers=headers)
+            return self._fetch(url, session().put,
+                body=self.encode(), headers=headers, decode=False)
         else:
             raise NotImplementedError("%s does not support PUT requests")
+
 
     def _post(self, querystring=None, headers=None, **path_vars):
         if "POST" in self.VERBS:
@@ -112,10 +114,11 @@ class BaseDOAJClient(object):
     def _delete(self):
         raise NotImplementedError("%s does not support DELETE requests")
 
-    def _fetch(self, url, method, body=None, headers=None):
+    def _fetch(self, url, method, body=None, headers=None, decode=True):
         logger.info("Fetching %s", url)
-        response = method(url)
-        if self._validate_response(response):
+        response = method(url, data=body, headers=headers)
+        logger.info(response)
+        if self._validate_response(response) and decode:
             self._decode(response.text)
 
     def _build_url(self, querystring, **path_args):
