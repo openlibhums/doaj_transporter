@@ -14,7 +14,7 @@ from submission.models import FrozenAuthor
 from utils.testing import helpers
 from utils import install
 
-from doaj_transporter.clients import DOAJArticle, ArticleSearchClient
+from plugins.doaj_transporter.clients import DOAJArticle, ArticleSearchClient
 
 
 class MockResponse(mock.Mock):

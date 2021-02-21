@@ -9,7 +9,7 @@ from identifiers.models import DOI_RE
 import requests
 from utils.logger import get_logger
 
-from doaj_transporter.data_structs import (
+from plugins.doaj_transporter.data_structs import (
     AdminStruct,
     AuthorStruct,
     BibjsonStruct,
@@ -18,9 +18,9 @@ from doaj_transporter.data_structs import (
     LicenseStruct,
     LinkStruct,
 )
-from doaj_transporter import exceptions
-from doaj_transporter import plugin_settings
-from doaj_transporter import schemas
+from plugins.doaj_transporter import exceptions
+from plugins.doaj_transporter import plugin_settings
+from plugins.doaj_transporter import schemas
 
 
 logger = get_logger(__name__)

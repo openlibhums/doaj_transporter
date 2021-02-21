@@ -12,12 +12,13 @@ import time
 from identifiers.models import Identifier
 from journal import models as journal_models
 from utils.logger import get_logger
+from utils.setting_handler import get_setting
 
 from plugins.doaj_transporter import (
     clients,
     exceptions,
+    logic,
     models,
-    plugin_settings,
 )
 
 logger = get_logger(__name__)
@@ -26,19 +27,23 @@ logger = get_logger(__name__)
 def synch_all_from_doaj(journal=None):
     """ Synchs DOAJ records into Janeway
     """
-    api_token = plugin_settings.DOAJ_API_TOKEN
     if journal:
         journals = [journal]
     else:
         journals = journal_models.Journal.objects.all()
-    for journal in journals:
-        search_client = clients.ArticleSearchClient(api_token)
-        if journal.publisher:
-            results = search_client.search_by_publisher(journal.publisher)
-            for result in results:
-                created = synch_result_from_doaj(result)
-        logger.info("Sleeping thread for 100ms")
-        time.sleep(0.1)
+    for j in journals:
+        api_token = get_setting("plugins:doaj_transporter", "doaj_api_token", journal=j)
+        if api_token:
+            logger.info("Pulling DOAJ records for: %s" % j)
+            search_client = clients.ArticleSearchClient(api_token)
+            if j.publisher:
+                results = search_client.search_by_publisher(j.publisher)
+                for result in results:
+                    created = synch_result_from_doaj(result)
+            logger.info("Sleeping thread for 200ms")
+            time.sleep(0.2)
+        else:
+            logger.info("No API token for journal: %s" % j)
 
 
 def synch_result_from_doaj(search_result):
@@ -56,14 +61,15 @@ def synch_result_from_doaj(search_result):
         try:
             doi = Identifier.objects.get(
                 id_type="doi", identifier=search_result.doi)
-            o, created = models.DOAJArticle.objects.get_or_create(
+            doaj_id, created = Identifier.objects.get_or_create(
                 article=doi.article,
-                doaj_id=search_result.id,
+                id_type="doaj",
+                identifier=search_result.id,
             )
             if created:
-                logger.debug("Matched %s to %s", search_result, o.article)
+                logger.debug("Matched %s to %s", search_result, doi.article)
                 logger.info(
-                    "Matched %s to article %s", search_result.id, o.article.pk)
+                    "Matched %s to article %s", search_result.id, doi.article.pk)
         except Identifier.DoesNotExist:
             logger.info("No article found for DOI %s", search_result.doi)
     return created

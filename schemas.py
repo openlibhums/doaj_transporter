@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, post_load, EXCLUDE
 
-from doaj_transporter import data_structs
+from plugins.doaj_transporter import data_structs
 
 class StructSchema(Schema):
     _STRUCT_CLS = None

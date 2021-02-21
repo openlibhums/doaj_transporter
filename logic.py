@@ -1,7 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-from doaj_transporter import clients, models
+from plugins.doaj_transporter import clients, models
 
 def push_article_to_doaj(article):
     """ Updates or creates a record in DOAJ for the given article
