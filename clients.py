@@ -8,6 +8,7 @@ from django.utils.http import urlencode
 from identifiers.models import DOI_RE
 import requests
 from utils.logger import get_logger
+from utils.setting_handler import get_setting
 
 from plugins.doaj_transporter.data_structs import (
     AdminStruct,
@@ -166,6 +167,11 @@ class BaseDOAJClient(object):
         else:
             response.raise_for_status()
 
+    @staticmethod
+    def get_token_from_settings(journal=None):
+        return get_setting(
+            "plugin:doaj_transporter", "doaj_api_token", journal=journal).value
+
 
 class DOAJArticle(BaseDOAJClient):
     OP_PATH = "/articles/{article_id}"
@@ -208,7 +214,7 @@ class DOAJArticle(BaseDOAJClient):
         :param article: An Instance of submission.models.Article
         :return: An instance of this class
         """
-        token = plugin_settings.DOAJ_API_TOKEN
+        token = cls.get_token_from_settings(article.journal)
         doaj_article = cls(token)
         doaj_article.abstract = strip_tags(article.abstract)
         doaj_article.title = strip_tags(article.title)
@@ -220,36 +226,22 @@ class DOAJArticle(BaseDOAJClient):
         doaj_article.keywords = [kw.word for kw in article.keywords.all()]
         doaj_article.link = cls.transform_urls(article)
         doaj_article.identifier = cls.transform_identifiers(article)
-        try:
-            doaj_article.id = article.doajarticle.doaj_id
-        except ObjectDoesNotExist:
-            doaj_article.id = None
+        doaj_article.id = article.get_identifier("doaj")
+        doaj_article.janeway_id = article.pk
 
 
         return doaj_article
 
     @classmethod
-    def from_doaj_id(cls, doaj_id):
+    def from_doaj_id(cls, doaj_id, token):
         """Loads a remote DOAJ Article from the given  doaj_id
         :param doaj_id: str
         :return: An instance of this class
         """
-        token = plugin_settings.DOAJ_API_TOKEN
         doaj_article = cls(token)
         doaj_article.id = doaj_id
         doaj_article.load()
         return doaj_article
-
-    @classmethod
-    def from_doaj_record(cls, doaj_record):
-        """Loads a DOAJ Article from a Janeway DOAJ Article record
-
-        Wraps from_article_model to load a DOAJArticle that had been
-        previously synched.
-        :param doaj_record: An Instance of models.DOAJArticle
-        :return: An instance of this class
-        """
-        return cls.from_article_model(doaj_record.article)
 
     def load(self):
         querystring = urlencode({"api_key": self.api_token})
