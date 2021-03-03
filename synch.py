@@ -36,8 +36,8 @@ def synch_all_from_doaj(journal=None):
         if api_token:
             logger.info("Pulling DOAJ records for: %s" % j)
             search_client = clients.ArticleSearchClient(api_token)
-            if j.publisher:
-                results = search_client.search_by_publisher(j.publisher)
+            if j.issn:
+                results = search_client.search_by_eissn(j.issn)
                 for result in results:
                     created = synch_result_from_doaj(result)
             logger.info("Sleeping thread for 200ms")

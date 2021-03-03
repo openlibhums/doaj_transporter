@@ -414,6 +414,7 @@ class DOAJArticle(BaseDOAJClient):
 
 
 class BaseSearchClient(BaseDOAJClient):
+    API_VERSION = "v2"
     OP_PATH = "/search/{search_type}/{search_query}"
     SEARCH_TYPE = ""
     SEARCH_QUERY_PREFIX = ""
@@ -505,6 +506,10 @@ class ArticleSearchClient(BaseSearchClient):
         else:
             prefix="publisher"
         return self.search(publisher, prefix=prefix)
+
+    def search_by_eissn(self, issn):
+        prefix="issn"
+        return self.search(issn, prefix=prefix)
 
 
 class ApplicationClient(BaseDOAJClient):
