@@ -154,7 +154,7 @@ class BaseDOAJClient(object):
                 attempts, self.TIMEOUT_ATTEMPTS,
             )
             if attempts < self.TIMEOUT_ATTEMPTS:
-                return self. _fetch(self, url, method, body, headers, decode)
+                return self. _fetch(url, method, body, headers, decode)
             raise exceptions.RequestFailed(
                 "DOAJ request timed out" % attempts)
         except requests.exceptions.ConnectionError as e:
@@ -194,6 +194,8 @@ class BaseDOAJClient(object):
 
         If the status code is not success (2[x][x]) it raises
         an HttpError
+        Children can implement 'error_handler' in order to handle
+        specific instances of HTTPError
         :param response: An HttpResponse
         :returns bool: True
         """
@@ -205,6 +207,8 @@ class BaseDOAJClient(object):
 
     def error_handler(self, response):
         """ Handle HTTP Errors from the response"""
+        if response.status_code == 401:
+            raise InvalidDOAJToken(response.request.url)
         response.raise_for_status()
 
     @staticmethod

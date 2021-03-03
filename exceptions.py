@@ -1,3 +1,6 @@
+class InvalidDOAJToken(Exception):
+    pass
+
 class MultipleResultsFound(Exception):
     pass
 
