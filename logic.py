@@ -1,37 +1,31 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from utils.logger import get_logger
 
 from plugins.doaj_transporter import clients, models
+
+logger = get_logger(__name__)
+
 
 def push_article_to_doaj(article):
     """ Updates or creates a record in DOAJ for the given article
     :param article: submission.models.Article
     """
-    try:
-        doaj_record = article.doajarticle
-    except ObjectDoesNotExist:
-        doaj_record = None
+    doi = article.get_identifier("doi")
+    if not doi:
+        logger.warning("Pushing article to DOAJ without a DOI")
 
     article_client = clients.DOAJArticle.from_article_model(article)
     article_client.upsert()
-    if not doaj_record:
-        doaj_record = models.DOAJArticle.objects.create(
-            article=article,
-            doaj_id=article_client.id,
-        )
 
-    doaj_record.last_updated = timezone.now()
-    doaj_record.save()
-
-    return doaj_record
+    return article_client.id
 
 
-def delete_article_from_doaj(doaj_record):
-    """ Deletes an articlefrom DOAJ as well as the local record
-    :param doaj_article: doaj_transporter.models.Article
+def delete_article_from_doaj(doaj_id):
+    """ Deletes an article from DOAJ as well as the local identifier
+    :param doaj_id: identifiers.models.Identifier
     """
-    article_client = clients.DOAJArticle.from_doaj_record(doaj_record)
+    article_client = clients.DOAJArticle.from_doaj_id(
+        doaj_id.identifier)
     article_client.delete()
-    doaj_record.delete()
-
-
+    doaj_id.delete()
