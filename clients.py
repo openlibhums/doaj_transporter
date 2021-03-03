@@ -208,7 +208,8 @@ class BaseDOAJClient(object):
     def error_handler(self, response):
         """ Handle HTTP Errors from the response"""
         if response.status_code == 401:
-            raise InvalidDOAJToken(response.request.url)
+            raise exceptions.InvalidDOAJToken(
+                response.request.url)
         response.raise_for_status()
 
     @staticmethod

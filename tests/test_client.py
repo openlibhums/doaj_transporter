@@ -1,5 +1,4 @@
 import datetime
-import os
 from unittest import mock
 
 from core import models as core_models
@@ -7,6 +6,8 @@ from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
+
+from identifiers import models as id_models
 from journal.models import Journal, Issue
 from press.models import Press
 from submission.models import Article, FrozenAuthor, Licence
@@ -15,6 +16,8 @@ from utils.testing import helpers
 from utils import install
 
 from plugins.doaj_transporter.clients import DOAJArticle, ArticleSearchClient
+
+SETTINGS_PATH = "plugins/doaj_transporter/install/settings.json"
 
 
 class MockResponse(mock.Mock):
@@ -42,6 +45,8 @@ class TestDOAJArticleClient(TestCase):
         self.journal.save()
 
         install.update_license(self.journal, management_command=False)
+        install.update_settings(
+            self.journal, file_path=SETTINGS_PATH)
 
         self.article = self._create_article(
             date_published=datetime.date(day=1, month=7,year=2019))
@@ -51,6 +56,7 @@ class TestDOAJArticleClient(TestCase):
             "publisher_record_id": null
         },
         "bibjson":{
+        "end_page": null,
             "identifier":[
                 {
                     "id":"0000-0000",
@@ -64,7 +70,8 @@ class TestDOAJArticleClient(TestCase):
             "author":[
                 {
                     "name":"Testla Musketeer",
-                    "affiliation":"OLH"
+                    "affiliation":"OLH",
+                    "orcid_id": null
                 }
             ],
             "journal":{
@@ -86,8 +93,9 @@ class TestDOAJArticleClient(TestCase):
             "keywords":[
 
             ],
-            "year":2019,
-            "month":7,
+            "year": "2019",
+            "month": "7",
+            "start_page": null,
             "subject": null,
             "title":"The art of writing test titles",
             "link":[
@@ -160,6 +168,47 @@ class TestDOAJArticleClient(TestCase):
         result = doaj_article.encode()
         self.maxDiff = None
         self.assertJSONEqual(result, self.encoded_article)
+
+    def test_insert_article(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        with mock.patch.object(
+            doaj_article, "_post", return_value=None) as caller:
+            doaj_article.upsert()
+
+            caller.assert_called_with("api_key=", article_id='')
+
+    def test_update_article(self):
+        id_models.Identifier.objects.create(
+            article=self.article,
+            id_type="doaj",
+            identifier="test",
+        )
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        with mock.patch.object(
+            doaj_article, "_put", return_value=None) as caller:
+            doaj_article.upsert()
+
+            caller.assert_called_with("api_key=", article_id='test')
+
+    def test_delete_article(self):
+        id_models.Identifier.objects.create(
+            article=self.article,
+            id_type="doaj",
+            identifier="test",
+        )
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        with mock.patch.object(
+            doaj_article, "_delete", return_value=None) as caller:
+            doaj_article.delete()
+
+            caller.assert_called_with("api_key=", article_id='test')
+        self.assertEqual(doaj_article.id, None)
+        with self.assertRaises(id_models.Identifier.DoesNotExist):
+            id_models.Identifier.objects.get(
+                article=self.article,
+                id_type="doaj",
+                identifier="test",
+            )
 
     @override_settings(DOAJ_API_TOKEN="dummy_key")
     def test_decode_article(self):
