@@ -292,26 +292,32 @@ class DOAJArticle_v1(BaseDOAJClient):
         response = self._get(querystring, article_id=self.id)
         self.log_response(response)
 
-    def upsert(self):
-        querystring = urlencode({"api_key": self.api_token})
-        doaj_id = None
-        if self.id:
-            response = self._put(querystring, article_id=self.id)
-            doaj_id, _ = Identifier.objects.get_or_create(
-                article=self.janeway_article,
-                id_type="doaj",
-                identifier=self.id,
-            )
-        else:
-            response = self._post(querystring, article_id='')
+    def upsert(self, force_delete=True):
+        try:
+            querystring = urlencode({"api_key": self.api_token})
+            doaj_id = None
             if self.id:
+                response = self._put(querystring, article_id=self.id)
                 doaj_id, _ = Identifier.objects.get_or_create(
                     article=self.janeway_article,
                     id_type="doaj",
                     identifier=self.id,
                 )
-        if response:
-            self.log_response(response, doaj_id)
+            else:
+                response = self._post(querystring, article_id='')
+                if self.id:
+                    doaj_id, _ = Identifier.objects.get_or_create(
+                        article=self.janeway_article,
+                        id_type="doaj",
+                        identifier=self.id,
+                    )
+            if response:
+                self.log_response(response, doaj_id)
+        except exceptions.ImmutableFieldChanged:
+            if force_delete:
+                self.delete()
+                self.upsert()
+            raise
 
     def delete(self):
         if not self.id:
@@ -342,21 +348,31 @@ class DOAJArticle_v1(BaseDOAJClient):
 
     def error_handler(self, response):
         if response.status_code == 404 and self.id:
-            # Article no longer exists on DOAJ
-            doaj_id, _ = Identifier.objects.filter(
-                article=self.janeway_article,
-                id_type="doaj",
-            ).delete()
-            models.DOAJDeposit.objects.create(
-                article=self.janeway_article,
-                identifier=self.id,
-                success=False,
-                result_text="DOAJ ID results in 404",
-            )
-            logger.warning("Received 404 on %s" % response.request.url)
-            self.id = None
-            return False
+            return self._handler_404(response)
+        elif response.status_code == 403 and self.id:
+            return self._handle_403(response)
         return super().error_handler(response)
+
+    def _handle_404(self, response):
+        # Article no longer exists on DOAJ
+        doaj_id, _ = Identifier.objects.filter(
+            article=self.janeway_article,
+            id_type="doaj",
+        ).delete()
+        models.DOAJDeposit.objects.create(
+            article=self.janeway_article,
+            identifier=self.id,
+            success=False,
+            result_text="DOAJ ID results in 404",
+        )
+        logger.warning("Received 404 on %s" % response.request.url)
+        self.id = None
+        raise exceptions.ResultNotFound(response.request.url)
+
+    def _handle_403(self, response):
+        # It is not documented but we see 403: forbidden when the article
+        # DOI or url is tampered with
+        raise exceptions.ImmutableFieldChanged(self.janeway_article)
 
     @staticmethod
     def transform_author(author):
