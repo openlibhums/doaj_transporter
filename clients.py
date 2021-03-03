@@ -213,7 +213,7 @@ class BaseDOAJClient(object):
             "plugin", "doaj_api_token", journal=journal).value
 
 
-class DOAJArticle(BaseDOAJClient):
+class DOAJArticle_v1(BaseDOAJClient):
     OP_PATH = "/articles/{article_id}"
     SCHEMA = schemas.ArticleSchema
     VERBS = {"GET", "POST", "PUT", "DELETE"}
@@ -419,6 +419,13 @@ class DOAJArticle(BaseDOAJClient):
                 )
             )
         return identifiers
+
+
+class DOAJArticle_v2(DOAJArticle_v1):
+    API_VERSION = "v2"
+
+
+DOAJArticle = DOAJArticle_v2
 
 
 class BaseSearchClient(BaseDOAJClient):
