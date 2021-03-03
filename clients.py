@@ -20,8 +20,8 @@ from plugins.doaj_transporter.data_structs import (
     LinkStruct,
 )
 from plugins.doaj_transporter import exceptions
-from plugins.doaj_transporter import plugin_settings
 from plugins.doaj_transporter import schemas
+from plugins.doaj_transporter import models
 
 
 logger = get_logger(__name__)
@@ -193,7 +193,11 @@ class BaseDOAJClient(object):
         if response.ok:
             return True
         else:
-            response.raise_for_status()
+            return self.error_handler(response)
+
+    def error_handler(self, response):
+        """ Handle HTTP Errors from the response"""
+        response.raise_for_status()
 
     @staticmethod
     def get_token_from_settings(journal=None):
@@ -273,28 +277,72 @@ class DOAJArticle(BaseDOAJClient):
 
     def load(self):
         querystring = urlencode({"api_key": self.api_token})
-        self._get(querystring, article_id=self.id)
+        response = self._get(querystring, article_id=self.id)
+        self.log_response(response)
 
     def upsert(self):
         querystring = urlencode({"api_key": self.api_token})
+        doaj_id = None
         if self.id:
-            self._put(querystring, article_id=self.id)
+            response = self._put(querystring, article_id=self.id)
+            doaj_id, _ = Identifier.objects.get_or_create(
+                article=self.janeway_article,
+                id_type="doaj",
+                identifier=self.id,
+            )
         else:
-            self._post(querystring, article_id='')
+            response = self._post(querystring, article_id='')
+            if self.id:
+                doaj_id, _ = Identifier.objects.get_or_create(
+                    article=self.janeway_article,
+                    id_type="doaj",
+                    identifier=self.id,
+                )
+        if response:
+            self.log_response(response, doaj_id)
 
     def delete(self):
         if not self.id:
             raise ValueError(
                 "Record has no DOAJ id, it can't be deleted: %s" % self)
         querystring = urlencode({"api_key": self.api_token})
-        self._delete(querystring, article_id=self.id)
+        response = self._delete(querystring, article_id=self.id)
+        import pdb; pdb.set_trace()  # XXX BREAKPOINT
+        self.log_response(response)
 
+    def log_response(self, response, doaj_id=None):
+        models.DOAJDeposit.objects.create(
+            article=self.janeway_article,
+            identifier=doaj_id,
+            success=response.ok,
+            result_text=response.text,
+        )
+
+    def error_handler(self, response):
+        if response.status_code == 404 and self.id:
+            # Article no longer exists on DOAJ
+            doaj_id, _ = Identifier.objects.get_or_create(
+                article=self.janeway_article,
+                id_type="doaj",
+                identifier=self.id,
+            )
+            models.DOAJDeposit.objects.create(
+                article=self.janeway_article,
+                identifier=doaj_id,
+                success=False,
+                result_text="DOAJ ID results in 404",
+            )
+            logger.warning("Received 404 on %s" % response.request.url)
+            doaj_id.delete()
+            return False
+        return super().error_handler(response)
 
     @staticmethod
     def transform_author(author):
         return AuthorStruct(
             name=author.full_name(),
             affiliation=author.affiliation(),
+            orcid_id=author.orcid or None,
         )
 
     @staticmethod
