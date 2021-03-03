@@ -134,11 +134,10 @@ class BaseDOAJClient(object):
         attempts = 1
         try:
             logger.info("Fetching %s", url)
-            import pdb; pdb.set_trace()  # XXX BREAKPOINT
-                response = method(
-                    url, data=body, headers=headers,
-                    timeout=self.TIMEOUT_SECS,
-                )
+            response = method(
+                url, data=body, headers=headers,
+                timeout=self.TIMEOUT_SECS,
+            )
 
             try:
                 logger.debug(response.json())
@@ -315,14 +314,24 @@ class DOAJArticle(BaseDOAJClient):
             raise ValueError(
                 "Record has no DOAJ id, it can't be deleted: %s" % self)
         querystring = urlencode({"api_key": self.api_token})
-        response = self._delete(querystring, article_id=self.id)
-        import pdb; pdb.set_trace()  # XXX BREAKPOINT
-        self.log_response(response)
+        self._delete(querystring, article_id=self.id)
+        models.DOAJDeposit.objects.create(
+            article=self.janeway_article,
+            identifier=self.id,
+            success=True,
+            result_text="DOAJ Record deleted",
+        )
+        doaj_id, _ = Identifier.objects.filter(
+            article=self.janeway_article,
+            id_type="doaj",
+            identifier=self.id,
+        ).delete()
+        self.id = None
 
     def log_response(self, response, doaj_id=None):
         models.DOAJDeposit.objects.create(
             article=self.janeway_article,
-            identifier=doaj_id,
+            identifier=self.id,
             success=response.ok,
             result_text=response.text,
         )
@@ -330,19 +339,18 @@ class DOAJArticle(BaseDOAJClient):
     def error_handler(self, response):
         if response.status_code == 404 and self.id:
             # Article no longer exists on DOAJ
-            doaj_id, _ = Identifier.objects.get_or_create(
+            doaj_id, _ = Identifier.objects.filter(
                 article=self.janeway_article,
                 id_type="doaj",
-                identifier=self.id,
-            )
+            ).delete()
             models.DOAJDeposit.objects.create(
                 article=self.janeway_article,
-                identifier=doaj_id,
+                identifier=self.id,
                 success=False,
                 result_text="DOAJ ID results in 404",
             )
             logger.warning("Received 404 on %s" % response.request.url)
-            doaj_id.delete()
+            self.id = None
             return False
         return super().error_handler(response)
 
