@@ -58,6 +58,8 @@ class BaseDOAJClient(object):
     OP_PATH = ""
     SCHEMA = None
     VERBS = set()
+    TIMEOUT_SECS = (5, 10)
+    TIMEOUT_ATTEMPTS = 3
 
     def __init__(self, api_token, codec=None, *args, **kwargs):
         self.api_token = api_token
@@ -128,11 +130,37 @@ class BaseDOAJClient(object):
             raise NotImplementedError("%s does not support DELETE requests")
 
     def _fetch(self, url, method, body=None, headers=None, decode=True):
-        logger.info("Fetching %s", url)
-        response = method(url, data=body, headers=headers)
-        logger.info(response)
-        if self._validate_response(response) and decode:
-            self._decode(response.text)
+        attempts = 1
+        try:
+            logger.info("Fetching %s", url)
+            import pdb; pdb.set_trace()  # XXX BREAKPOINT
+                response = method(
+                    url, data=body, headers=headers,
+                    timeout=self.TIMEOUT_SECS,
+                )
+
+            try:
+                logger.debug(response.json())
+            except JSONDecodeError:
+                logger.warning("Received non-JSON response from DOAJ:")
+                logger.warning(response.text or '""')
+            else:
+                if self._validate_response(response) and decode:
+                    self._decode(response.text)
+        except requests.exceptions.Timeout:
+            attempts += 1
+            logger.warning(
+                "Request timed out [%s out of %s], retrying...",
+                attempts, self.TIMEOUT_ATTEMPTS,
+            )
+            if attempts < self.TIMEOUT_ATTEMPTS:
+                return self. _fetch(self, url, method, body, headers, decode)
+            raise exceptions.RequestFailed(
+                "DOAJ request timed out" % attempts)
+        except requests.exceptions.ConnectionError as e:
+            raise exceptions.RequestFailed(
+                "DOAJ unreachable at: " % url)
+
 
     def _build_url(self, querystring, **path_args):
         url = self.API_URL.format(
