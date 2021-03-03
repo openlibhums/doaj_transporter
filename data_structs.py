@@ -34,10 +34,8 @@ class BaseStruct():
         return repr(self)
 
 
-
-
 class AuthorStruct(BaseStruct):
-    __slots__ = ["name", "affiliation"]
+    __slots__ = ["name", "affiliation", "orcid_id"]
 
 
 class IdentifierStruct(BaseStruct):

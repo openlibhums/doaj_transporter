@@ -52,6 +52,7 @@ class AuthorSchema(StructSchema):
     _STRUCT_CLS = data_structs.AuthorStruct
     name = fields.String()
     affiliation = fields.String()
+    orcid_id = fields.String()
 
 
 class SubjectSchema(StructSchema):
