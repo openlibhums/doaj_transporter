@@ -1,11 +1,12 @@
-import time
+from json import JSONDecodeError
 import threading
+import time
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.html import strip_tags
 from django.utils.http import urlencode
-from identifiers.models import DOI_RE
+from identifiers.models import DOI_RE, Identifier
 import requests
 from utils.logger import get_logger
 from utils.setting_handler import get_setting
@@ -210,7 +211,7 @@ class BaseDOAJClient(object):
     @staticmethod
     def get_token_from_settings(journal=None):
         return get_setting(
-            "plugin:doaj_transporter", "doaj_api_token", journal=journal).value
+            "plugin", "doaj_api_token", journal=journal).value
 
 
 class DOAJArticle(BaseDOAJClient):
@@ -267,7 +268,7 @@ class DOAJArticle(BaseDOAJClient):
         doaj_article.link = cls.transform_urls(article)
         doaj_article.identifier = cls.transform_identifiers(article)
         doaj_article.id = article.get_identifier("doaj")
-        doaj_article.janeway_id = article.pk
+        doaj_article.janeway_article = article
 
 
         return doaj_article

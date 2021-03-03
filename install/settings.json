@@ -1,7 +1,7 @@
 [
   {
     "group": {
-      "name": "plugins:doaj_transporter"
+      "name": "plugin"
     },
     "setting": {
       "description": "The DOAJ API key for metadata deposits",

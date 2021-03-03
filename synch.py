@@ -32,7 +32,7 @@ def synch_all_from_doaj(journal=None):
     else:
         journals = journal_models.Journal.objects.all()
     for j in journals:
-        api_token = get_setting("plugins:doaj_transporter", "doaj_api_token", journal=j)
+        api_token = get_setting("plugin", "doaj_api_token", journal=j)
         if api_token:
             logger.info("Pulling DOAJ records for: %s" % j)
             search_client = clients.ArticleSearchClient(api_token)
@@ -58,6 +58,7 @@ def synch_result_from_doaj(search_result):
     """
     created = False
     if search_result.doi:
+        logger.info("Processing article with doi %s" % search_result.doi)
         try:
             doi = Identifier.objects.get(
                 id_type="doi", identifier=search_result.doi)
@@ -71,7 +72,7 @@ def synch_result_from_doaj(search_result):
                 logger.info(
                     "Matched %s to article %s", search_result.id, doi.article.pk)
         except Identifier.DoesNotExist:
-            logger.info("No article found for DOI %s", search_result.doi)
+            logger.warning("No article found for DOI %s", search_result.doi)
     return created
 
 
@@ -86,15 +87,15 @@ def synch_all_from_janeway(journal=None, push=False):
         journals = [journal]
     else:
         journals = journal_models.Journal.objects.all()
-    for journal in journals:
+    for j in journals:
         for article in journal.article_set.filter(stage="Published"):
             doi = article.get_doi()
             if doi:
                 obj, c = synch_article_from_janeway(article)
                 if push:
                     logic.push_article_to_doaj(article)
-                logger.info("Thread Sleeping for 250ms")
-                time.sleep(0.25)
+                logger.info("Thread Sleeping for 200ms")
+                time.sleep(0.20)
 
 
 def synch_article_from_janeway(article):
@@ -103,18 +104,23 @@ def synch_article_from_janeway(article):
     :return: A tuple with the local record and bool flagging its creation
     """
     doi = article.get_doi()
-    api_token = plugin_settings.DOAJ_API_TOKEN
+    api_token = get_setting(
+        "plugin", "doaj_api_token", journal=article.journal)
     created = obj = None
     try:
-        models.DOAJArticle.objects.get(article=article)
-    except models.DOAJArticle.DoesNotExist:
+        doaj_id = Identifier.objects.get(
+            id_type="doaj", article=article
+        ).identifier
+    except Identifier.DoesNotExist:
         search_client = clients.ArticleSearchClient(api_token)
         results = search_client.search_by_doi(doi)
         try:
+            logger.debug("Searching DOAJ with DOI %s" % doi)
             doaj_id = next(results).id
-            obj, created = models.DOAJArticle.objects.get_or_create(
-                article=article,
-                doaj_id=doaj_id,
+            doaj_id, created = Identifier.objects.get_or_create(
+                article=doi.article,
+                id_type="doaj",
+                identifier=search_result.id,
             )
             if created:
                 logger.info("New DOAJ record for article %s ", article.pk)
