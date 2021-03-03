@@ -177,7 +177,15 @@ class BaseDOAJClient(object):
         return self._codec.dumps(self)
 
     def _decode(self, encoded):
-        decoded = self._codec.loads(encoded)
+        try:
+            decoded = self._codec.loads(encoded)
+        except Exception:
+            if settings.DEBUG:
+                logger.debug("Failed to decode JSON")
+                import pdb; pdb.set_trace()  # XXX BREAKPOINT
+                raise
+            else:
+                raise
         for key, value in decoded.items():
             setattr(self, key, value)
 
