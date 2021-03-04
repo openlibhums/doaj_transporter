@@ -1,3 +1,6 @@
+import time
+
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from utils.logger import get_logger
@@ -5,6 +8,14 @@ from utils.logger import get_logger
 from plugins.doaj_transporter import clients, models
 
 logger = get_logger(__name__)
+
+
+def check_debug_settings():
+    if settings.DEBUG:
+        if hasattr(settings, 'DOAJ_PUSH_ON_DEBUG'):
+            return settings.DOAJ_PUSH_ON_DEBUG
+        return False
+    return True
 
 
 def push_article_to_doaj(article):
@@ -15,17 +26,36 @@ def push_article_to_doaj(article):
     if not doi:
         logger.warning("Pushing article to DOAJ without a DOI")
 
-    article_client = clients.DOAJArticle.from_article_model(article)
-    article_client.upsert()
+    if check_debug_settings():
+        article_client = clients.DOAJArticle.from_article_model(article)
+        article_client.upsert()
+        return article_client.id
+    encoded = encode_article_to_doaj_json(article)
+    logger.debug("Ignoring DOAJ upsert on DEBUG mode")
+    logger.debug(encoded)
+    return encoded
 
-    return article_client.id
+
+def push_issue_to_doaj(issue):
+    for article in issue.articles:
+        push_article_to_doaj(article)
+        logger.info("Sleeping thread for 200ms")
+        time.sleep(0.2)
+
+
+def encode_article_to_doaj_json(article):
+    article_client = clients.DOAJArticle.from_article_model(article)
+    return article_client.encode()
 
 
 def delete_article_from_doaj(doaj_id):
     """ Deletes an article from DOAJ as well as the local identifier
     :param doaj_id: identifiers.models.Identifier
     """
-    article_client = clients.DOAJArticle.from_doaj_id(
-        doaj_id.identifier)
-    article_client.delete()
-    doaj_id.delete()
+    if check_debug_settings():
+        article_client = clients.DOAJArticle.from_doaj_id(
+            doaj_id.identifier)
+        article_client.delete()
+        doaj_id.delete()
+    else:
+        logger.debug("Ignoring DOAJ delete on DEBUG mode")
