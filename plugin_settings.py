@@ -4,11 +4,11 @@ from utils import models
 from utils.install import update_settings
 from plugins.doaj_transporter import events as plugin_events
 
-PLUGIN_NAME = 'doaj'
+PLUGIN_NAME = 'doaj_transporter'
 DESCRIPTION = 'A plugin for exporting metadata to DOAJ via their API'
 AUTHOR = 'Mauro Sanchez'
 VERSION = '1.0'
-SHORT_NAME = 'DOAJ'
+SHORT_NAME = 'doaj_transporter'
 DISPLAY_NAME = 'DOAJ Transporter'
 MANAGER_URL = 'doaj_index'
 

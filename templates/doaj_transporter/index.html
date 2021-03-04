@@ -1,0 +1,116 @@
+{% extends "admin/core/base.html" %}
+{% load static from staticfiles %}
+
+{% block title %}DOAJ Transporter{% endblock %}
+{% block title-section %}DOAJ Transporter{% endblock %}
+
+{% block body %}
+<style>
+.callout-border {
+    border-left: 0.3125rem solid #8a8a8a;
+}
+.callout-border-success {
+    border-left: 0.3125rem solid #3adb76;
+}
+.callout-border-danger {
+    border-left: 0.3125rem solid #cc4b37;
+}
+.callout-border-primary {
+    border-left: 0.3125rem solid #1779ba;
+}
+.badge {
+    display: inline-block;
+    padding: .25em .4em;
+        padding-right: 0.4em;
+        padding-left: 0.4em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: .25rem;
+}
+.badge-pill {
+    padding-right: .6em;
+    padding-left: .6em;
+    border-radius: 10rem;
+}
+.badge-primary {
+    color: #fff;
+    background-color: #007bff;
+}
+.badge-warning {
+    color: #212529;
+    background-color: #ffc107;
+}
+.justify-content-between {
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    display: flex;
+}
+</style>
+    <div class="large-12 columns">
+        <div class="box">
+            <div class="content">
+                    <div class="small-4 columns">
+                        <div class="callout small {% if api_token %}callout-border-success{% else %}callout-border-danger{% endif %}">
+                            <h4>API Token</h4>
+                            <p>{% if api_token %}YES{% else %}NO{% endif %}</p>
+                        </div>
+                    </div>
+
+                    <div class="small-4 columns">
+                        <div class="callout small {% if not request.journal %}callout-border{% elif push_enabled %}callout-border-success{% else %}callout-border-danger{% endif %}">
+                            <h4>Push Enabled</h4>
+                            {% if request.journal %}
+                            <p>{% if push_enabled %}YES{% else %}NO{% endif %}</p>
+                            {% else %}
+                            <p>{% if push_enabled %}YES{% else %}NO{% endif %}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="small-4 columns">
+                        <div class="callout small callout-border-primary">
+                            <h4>In DOAJ</h4>
+                            <p>{{ in_doaj }}</p>
+                        </div>
+                    </div>
+                <a class="button"> Configure </a>
+                <br />
+            </div>
+          {% if issues %}
+            <div class="title-area">
+                <h2>Issues</h2>
+            </div>
+            <div class="content">
+                <ul class="list-group">
+                  <form method="POST">
+                    {% csrf_token %}
+                    {% for issue in issues %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                          <span>
+                            {{ issue }}
+                            <span class="badge badge-{% if issue.count_doaj < issue.count_articles %}warning{% else %}primary{% endif %} badge-pill">
+                                {{ issue.count_doaj }}/{{ issue.count_articles }}
+                            </span>
+                          </span>
+                          <span>
+                              <a href="{% url 'doaj_configure' %}" type="submit" class="small button pill">View</a>
+                            <button name="push" value="{{ issue.pk }}" type="submit" class="small success button">Push to DOAJ</button>
+                          </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript" src="{% static "js/bootstrap-filestyle.min.js" %}"></script>
+{% endblock %}
+
