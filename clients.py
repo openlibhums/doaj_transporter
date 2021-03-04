@@ -170,7 +170,7 @@ class BaseDOAJClient(object):
                 "DOAJ unreachable at: " % url)
         except requests.exceptions.RequestException as e:
             logger.error("Unexpected error from DOAJ")
-            tb.format_exc()
+            tb.print_exc()
             raise exceptions.RequestFailed(
                 "DOAJ unreachable at: " % url)
 

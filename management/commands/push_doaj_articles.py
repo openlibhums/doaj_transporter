@@ -47,6 +47,7 @@ class Command(BaseCommand):
                     time.sleep(0.2)
                 except Exception as e:
                     self.stderr.write("[%s] Failed to push:" % article.pk)
-                    tb.format_exc()
+                    err = e
+                    tb.print_exc()
 
 
