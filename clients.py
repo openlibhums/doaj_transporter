@@ -1,6 +1,7 @@
 from json import JSONDecodeError
 import threading
 import time
+import traceback as tb
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -8,6 +9,8 @@ from django.utils.html import strip_tags
 from django.utils.http import urlencode
 from identifiers.models import DOI_RE, Identifier
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from utils.logger import get_logger
 from utils.setting_handler import get_setting
 
@@ -28,13 +31,26 @@ from plugins.doaj_transporter import models
 logger = get_logger(__name__)
 _local = threading.local()
 
+RETRY_ATTEMPTS = 5
+RETRY_BACKOFF_FACTOR = 0.2
+RETRY_ON_STATUS = [502, 503, 504, 429],
+RETRY_METHODS = {'DELETE', 'GET', 'HEAD', 'PUT', 'POST'}
+
 
 def session():
     """Lazily loads and returns a requests session for this thread"""
     try:
         return _local.session
     except AttributeError:
-        _local.session = requests.session()
+        _session = requests.session()
+        retry = Retry(
+            total=RETRY_ATTEMPTS,
+            backoff_factor=RETRY_BACKOFF_FACTOR,
+            status_forcelist=RETRY_ON_STATUS,
+            method_whitelist=RETRY_METHODS,
+        )
+        _session.mount('http://', HTTPAdapter(max_retries=retry))
+        _local.session = _session
         return session()
 
 
@@ -131,7 +147,6 @@ class BaseDOAJClient(object):
             raise NotImplementedError("%s does not support DELETE requests")
 
     def _fetch(self, url, method, body=None, headers=None, decode=True):
-        attempts = 1
         try:
             logger.info("Fetching %s", url)
             response = method(
@@ -148,16 +163,14 @@ class BaseDOAJClient(object):
                 if self._validate_response(response) and decode:
                     self._decode(response.text)
         except requests.exceptions.Timeout:
-            attempts += 1
-            logger.warning(
-                "Request timed out [%s out of %s], retrying...",
-                attempts, self.TIMEOUT_ATTEMPTS,
-            )
-            if attempts < self.TIMEOUT_ATTEMPTS:
-                return self. _fetch(url, method, body, headers, decode)
             raise exceptions.RequestFailed(
                 "DOAJ request timed out" % attempts)
         except requests.exceptions.ConnectionError as e:
+            raise exceptions.RequestFailed(
+                "DOAJ unreachable at: " % url)
+        except requests.exceptions.RequestException as e:
+            logger.error("Unexpected error from DOAJ")
+            tb.format_exc()
             raise exceptions.RequestFailed(
                 "DOAJ unreachable at: " % url)
 
