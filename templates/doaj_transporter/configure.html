@@ -1,0 +1,56 @@
+{% extends "admin/core/base.html" %}
+{% load static from staticfiles %}
+{% load bootstrap4 %}
+
+{% block title %}DOAJ Transporter - Configuration{% endblock %}
+{% block title-section %}DOAJ Transporter - Configuration{% endblock %}
+
+{% block body %}
+
+<div class="large-12 columns">
+    <div class="box">
+            <div class="title-area">
+                <h2>Configure DOAJ</h2>
+            </div>
+        <div class="content">
+            <form method="POST">
+            {% csrf_token %}
+            {% if request.journal %}
+                <h4>{{ token.setting.pretty_name }}</h4>
+                {% if not token.journal and token.value %}
+                <div class="callout alert">
+                  <h5>Warning</h5>
+                  <p>There is a DOAJ token installed at the Press level, you only need to set this token if this journal deposits with DOAJ using a different account</p>
+                    <button class="close-button" aria-label="Dismiss alert" type="button" data-close>
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                {% endif %}
+                <p>{{ token.setting.description|safe }}</p>
+                {% bootstrap_form token_form layout='inline' %}
+                <input type="checkbox" name="journal_push" id="{{ request.journal.code }}" value="{{ request.journal.code }}"{% if push_enabled %} checked{% endif %}>
+                <label for="{{ request.journal.code }}">Automatically push article metadata when an article is published</label>
+                <br>
+
+            {% else %}
+                <h4>{{ token.setting.pretty_name }}</h4>
+                <p>{{ token.setting.description|safe }}</p>
+                {% bootstrap_form token_form layout='inline' %}
+                <p> All journals will use this API Token unless they have an override set</p>
+                <h4>Automatic push to DOAJ on article publication</h4>
+                {% for journal, enabled in journals.items %}
+                <input type="checkbox" name="journal_push" id="{{ journal.code }}" value="{{ journal.code }}"{% if enabled %} checked{%endif%}>
+                <label for="{{ journal.code }}">{{ journal }}</label>
+                <br>
+                {% endfor %}
+            {% endif %}
+            {% buttons %}
+                <button type="submit" class="button success" style="margin-right:5px">
+                    {% bootstrap_icon "ok" %} Submit
+                </button>
+            {% endbuttons %}
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

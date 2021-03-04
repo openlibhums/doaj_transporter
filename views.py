@@ -62,9 +62,85 @@ def index(request):
     return render(request, template, context)
 
 
-def settings(request):
+def configure(request):
+    token = setting_handler.get_setting(
+        "plugin", "doaj_api_token", journal=request.journal)
+    journals = {}
+    push_enabled = False
+    if request.journal:
+        push_enabled = setting_handler.get_setting(
+            "plugin", "doaj_publish_push", journal=request.journal,
+                default=False,
+        )
+    else:
+        for journal in request.press.journals():
+            enabled = setting_handler.get_setting(
+                "plugin", "doaj_publish_push", journal=journal,
+                default=False,
+            )
+            if enabled:
+                journals[journal] = True
+            else:
+                journals[journal] = False
 
-    template = 'doaj/settings.html'
-    context = {}
+
+    if token.journal == request.journal:
+        initial_token = token.value
+    else:
+        initial_token = None
+    token_form = core_forms.EditKey(
+            key_type=token.setting.types,
+            value=initial_token or None,
+    )
+    if request.POST:
+        token_form
+        posted_codes = set(request.POST.getlist("journal_push", []))
+        posted_token = request.POST.get("value")
+        if posted_token:
+            setting_handler.save_setting(
+                "plugin", "doaj_api_token", journal=request.journal,
+                value=posted_token
+            )
+        if request.journal:
+                #If blank, delete potential override
+            if not posted_token and token.journal:
+                token.delete()
+            if request.journal.code in posted_codes:
+                setting_handler.save_setting(
+                    "plugin", "doaj_publish_push", journal=request.journal,
+                    value=True,
+                )
+            else:
+                push_enabled = setting_handler.get_setting(
+                    "plugin", "doaj_publish_push",
+                    journal=request.journal,
+                    default=False,
+                )
+                if push_enabled:
+                    push_enabled.delete()
+        else:
+            for journal in request.press.journals():
+                if journal.code in posted_codes:
+                    setting_handler.save_setting(
+                        "plugin", "doaj_publish_push", journal=journal,
+                        value=True,
+                )
+                else:
+                    enabled = setting_handler.get_setting(
+                        "plugin", "doaj_publish_push", journal=journal,
+                        default=False,
+                    )
+                    if enabled:
+                        enabled.delete()
+        return redirect(reverse("doaj_configure"))
+
+
+    template = 'doaj_transporter/configure.html'
+    context = {
+        "token_form": token_form,
+        "token": token,
+        "journals": journals,
+        "push_enabled": push_enabled,
+    }
 
     return render(request, template, context)
