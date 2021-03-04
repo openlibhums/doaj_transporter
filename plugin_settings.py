@@ -1,5 +1,6 @@
 from utils import models
 from utils.install import update_settings
+from plugins.doaj_transporter import events as plugin_events
 
 PLUGIN_NAME = 'doaj'
 DESCRIPTION = 'A plugin for exporting metadata to DOAJ via their API'
@@ -33,6 +34,9 @@ def install():
     else:
         print('Plugin {0} is already installed.'.format(PLUGIN_NAME))
 
+
+def register_for_events():
+    return plugin_events.register_for_events()
 
 def hook_registry():
     # On site load, the load function is run for each installed plugin to
