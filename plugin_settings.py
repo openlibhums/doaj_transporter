@@ -1,14 +1,19 @@
+import os
+
 from utils import models
 from utils.install import update_settings
 from plugins.doaj_transporter import events as plugin_events
 
 PLUGIN_NAME = 'doaj'
 DESCRIPTION = 'A plugin for exporting metadata to DOAJ via their API'
-AUTHOR = 'Mauro Sanchez Lopez'
+AUTHOR = 'Mauro Sanchez'
 VERSION = '1.0'
 SHORT_NAME = 'DOAJ'
-DISPLAY_NAME = 'DOAJ'
+DISPLAY_NAME = 'DOAJ Transporter'
 MANAGER_URL = 'doaj_index'
+
+PLUGIN_PATH = os.path.dirname(os.path.realpath(__file__))
+JSON_SETTINGS_PATH = os.path.join(PLUGIN_PATH, "install/settings.json")
 
 
 def install():
@@ -28,9 +33,11 @@ def install():
         )
     elif plugin.version != VERSION:
         print('Plugin updated: {0} -> {1}'.format(VERSION, plugin.version))
-        update_settings(
-            file_path='plugins/doaj_transporter/install/settings.json'
-        )
+        update_settings( file_path=JSON_SETTINGS_PATH)
+        plugin.version = VERSION
+        plugin.display_name = DISPLAY_NAME
+        plugin.save()
+
     else:
         print('Plugin {0} is already installed.'.format(PLUGIN_NAME))
 

@@ -13,5 +13,20 @@
     "value": {
       "default": ""
     }
+  },
+  {
+    "group": {
+      "name": "plugin"
+    },
+    "setting": {
+      "description": "If enabled, article metadata will be pushed to DOAJ when an article is published",
+      "is_translatable": false,
+      "name": "doaj_publish_push",
+      "pretty_name": "DOAJ Push on publication",
+      "type": "boolean"
+    },
+    "value": {
+      "default": ""
+    }
   }
 ]
