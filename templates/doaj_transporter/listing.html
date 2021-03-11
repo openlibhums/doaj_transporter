@@ -7,67 +7,18 @@
     <div class="large-12 columns">
         <div class="box">
             <div class="title-area">
-                <h2>Issues</h2>
-            </div>
-            <div class="content">
-                <form method="POST">
-                    {% csrf_token %}
-                    <table id="issues">
-                        <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th>Volume</th>
-                            <th>Number</th>
-                            <th>Date</th>
-                            <th>No. Articles</th>
-                            <th></th>
-                            <th></th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody {% if not issue %}class="sortable"{% endif %}>
-                        {% for i in issues %}
-                            <tr {% if not issue %}id="issues-{{ i.pk }}"{% endif %}>
-                                <td>{{ i.issue_title }}</td>
-                                <td>{{ i.issue_type }}</td>
-                                <td>{{ i.volume }}</td>
-                                <td>{{ i.issue }}</td>
-                                <td>{{ i.date|date:"Y-m-d" }}</td>
-                                <td>{{ i.articles.all|length }}</td>
-                                <td>
-                                    <a href="{% url 'manage_issues_id' i.pk %}"><i class="fa fa-eye">&nbsp;</i>View</a>
-                                </td>
-                                <td>
-                                    <button name="export-issue" value="{{ i.pk }}" class="small success button"><i
-                                            class="fa fa-download" aria-hidden="true">&nbsp;</i>Export
-                                    </button>
-                                </td>
-                                <td>
-                                    <button name="send-to-doaj" value="{{ i.pk }}" class="small success button"><i
-                                            class="fa fa-upload" aria-hidden="true">&nbsp;</i>Send to DOAJ
-                                    </button>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </form>
-            </div>
-        </div>
-        <div class="box">
-            <div class="title-area">
                 <h2>Articles</h2>
             </div>
             <div class="content">
-                <form method="POST">
+                <form method="POST" action="{% url 'doaj_push_article' %}">
                     {% csrf_token %}
-                    <table class="article_list">
+                    <table class="article_list" id="articles">
                         <thead>
                         <tr>
-                            <td width="60%">Title</td>
+                            <td width="30%">Title</td>
                             <td>Published</td>
                             <td>Identifier</td>
+                            <td>Latest Push</td>
                             <td></td>
                         </tr>
                         </thead>
@@ -80,9 +31,20 @@
                                 <td>{{ article.date_published }}</td>
                                 <td>{{ article.identifier }}</td>
                                 <td>
-                                    <button name="export-article" value="{{ article.pk }}" class="small success button">
+                                    {{ article.latest_deposit.date_time }}&nbsp
+                                    {% if article.latest_deposit.success %}
+                                    <span class="fa fa-check-circle" style="color:green;"></span>
+                                    {% elif article.latest_deposit.success %}
+                                    <span class="fa fa-times-circle" style="color:red;" data-tooltip tabindex="1" title="{{ article.latest_depost.result_text }}" data-position="bottom" data-alignment="center"></span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url doaj_article_json article.pk %}" target="_blank">View JSON</a>
+                                    <button name="article_id" value="{{ article.pk }}" class="small success button"
+                                     {% if not article.can_push %}data-tooltip tabindex="1" title="Article is not ready to be sent to DOAJ" data-position="bottom" data-alignment="center" disabled{% endif %}
+                                    >
                                         <i
-                                                class="fa fa-download" aria-hidden="true">&nbsp;</i>Export
+                                                class="fa fa-paper-plane" aria-hidden="true">&nbsp;</i> Push
                                     </button>
                                 </td>
                             </tr>
@@ -96,5 +58,5 @@
 {% endblock %}
 
 {% block js %}
-    {% include "elements/datatables.html" with target="#issues" %}
+    {% include "elements/datatables.html" with target="#articles" %}
 {% endblock %}

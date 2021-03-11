@@ -9,8 +9,11 @@ from journal import models as journal_models
 from submission import models as sm_models
 from security.decorators import editor_user_required
 from utils import setting_handler
+from utils.logger import get_logger
 
-from plugins.doaj_transporter import plugin_settings, logic
+from plugins.doaj_transporter import logic, plugin_settings, models
+
+logger = get_logger(__name__)
 
 
 @editor_user_required
@@ -170,3 +173,46 @@ def push_issue(request):
             "%s articles pushed to DOAJ" % issue.articles.count(),
         )
     return redirect(request.META.get("HTTP_REFERER"))
+
+
+@require_POST
+@editor_user_required
+def push_article(request):
+    article_id = request.POST.get("article_id")
+    article = get_object_or_404(sm_models.Article,
+        id=article_id,
+        journal=request.journal,
+    )
+    try:
+        logic.push_article_to_doaj(article)
+    except Exception as e:
+        messages.add_message(
+            request, messages.ERROR,
+            "Push failed: %s" % e,
+        )
+        logger.error("[DOAJ] Error pushing article %s to doaj:", article.pk)
+        logger.error("[DOAJ] %s", e)
+    else:
+        messages.add_message(
+            request, messages.SUCCESS,
+            "Article pushed to DOAJ",
+        )
+
+    return redirect(request.META.get("HTTP_REFERER"))
+
+
+@editor_user_required
+def list_issue(request, issue_id=None):
+    articles = models.Article.objects.filter(
+        issues__id=issue_id,
+        journal=request.journal
+    ).order_by(
+        "date_published"
+    )
+
+    template = 'doaj_transporter/listing.html'
+    context = {
+        "articles": articles,
+    }
+
+    return render(request, template, context)

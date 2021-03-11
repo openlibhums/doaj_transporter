@@ -97,7 +97,7 @@
                             </span>
                           </span>
                           <span>
-                              <a href="" type="submit" class="small button pill">View</a>
+                              <a href="{% url 'doaj_list_issue' issue.pk %}" type="submit" class="small button pill">View</a>
                             <button name="issue_id" value="{{ issue.pk }}" type="submit" class="small success button">Push to DOAJ</button>
                           </span>
                         </li>
