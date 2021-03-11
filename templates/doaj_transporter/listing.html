@@ -12,7 +12,7 @@
             <div class="content">
                 <form method="POST" action="{% url 'doaj_push_article' %}">
                     {% csrf_token %}
-                    <table class="article_list" id="articles">
+                    <table class="small article_list" id="articles">
                         <thead>
                         <tr>
                             <td width="30%">Title</td>
@@ -34,12 +34,17 @@
                                     {{ article.latest_deposit.date_time }}&nbsp
                                     {% if article.latest_deposit.success %}
                                     <span class="fa fa-check-circle" style="color:green;"></span>
-                                    {% elif article.latest_deposit.success %}
-                                    <span class="fa fa-times-circle" style="color:red;" data-tooltip tabindex="1" title="{{ article.latest_depost.result_text }}" data-position="bottom" data-alignment="center"></span>
+                                    {% elif article.latest_deposit.success == False %}
+                                    <span class="fa fa-times-circle" style="color:red;" data-tooltip tabindex="1" title="{{ article.latest_deposit.result_text }}" data-position="bottom" data-alignment="center"></span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{% url doaj_article_json article.pk %}" target="_blank">View JSON</a>
+                                    {% if request.user.is_staff %}
+                                    <a class="small button" href="{% url 'admin:doaj_transporter_doajdeposit_changelist' %}?article__id__exact=article.pk" target="_blank">Admin logs</a>
+                                    {% endif %}
+                                    {% if article.can_push %}
+                                    <a class="small button" href="{% url 'doaj_article_json' article.pk %}" target="_blank">View JSON</a>
+                                    {% endif %}
                                     <button name="article_id" value="{{ article.pk }}" class="small success button"
                                      {% if not article.can_push %}data-tooltip tabindex="1" title="Article is not ready to be sent to DOAJ" data-position="bottom" data-alignment="center" disabled{% endif %}
                                     >

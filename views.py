@@ -1,6 +1,7 @@
 from django.db.models import Count
 from django.contrib import messages
 from django.core.urlresolvers import reverse
+from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, render, redirect
 
@@ -216,3 +217,13 @@ def list_issue(request, issue_id=None):
     }
 
     return render(request, template, context)
+
+@editor_user_required
+def article_json(request, article_id=None):
+    article = get_object_or_404(sm_models.Article,
+        id=article_id,
+        journal=request.journal,
+    )
+    json_data = logic.encode_article_to_doaj_json(article)
+
+    return HttpResponse(json_data, content_type="application/json")
