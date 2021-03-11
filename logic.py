@@ -1,8 +1,10 @@
 import time
+import traceback as tb
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from submission import models as sm_models
 from utils.logger import get_logger
 
 from plugins.doaj_transporter import clients, models
@@ -36,12 +38,26 @@ def push_article_to_doaj(article):
     return encoded
 
 
-def push_issue_to_doaj(issue):
-    for article in issue.articles:
-        push_article_to_doaj(article)
-        logger.info("Sleeping thread for 200ms")
-        time.sleep(0.2)
-
+def push_issue_to_doaj(issue, raise_on_error=True):
+    errors = {}
+    for article in issue.articles.filter(
+        stage=sm_models.STAGE_PUBLISHED,
+    ):
+        if article.date_published:
+            try:
+                push_article_to_doaj(article)
+                logger.info("Sleeping thread for 200ms")
+                time.sleep(0.2)
+            except Exception as e:
+                if raise_on_error:
+                    raise
+                errors[article.pk] = e
+                logger.error(
+                    "[DOAJ] Error pushing article %s of issue %s",
+                    article.pk, issue
+                )
+                tb.print_exc()
+    return errors
 
 def encode_article_to_doaj_json(article):
     article_client = clients.DOAJArticle.from_article_model(article)

@@ -1,16 +1,19 @@
 from django.db.models import Count
 from django.contrib import messages
 from django.core.urlresolvers import reverse
-from django.shortcuts import render, redirect
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404, render, redirect
 
 from core import forms as core_forms
 from journal import models as journal_models
 from submission import models as sm_models
+from security.decorators import editor_user_required
 from utils import setting_handler
 
 from plugins.doaj_transporter import plugin_settings, logic
 
 
+@editor_user_required
 def index(request):
     token = setting_handler.get_setting(
         "plugin", "doaj_api_token", journal=request.journal).value
@@ -26,7 +29,7 @@ def index(request):
     else:
         total = 0
         enabled = 0
-        for journal in request.press.journals.all():
+        for journal in request.press.journals():
             journal_enabled = setting_handler.get_setting(
                 "plugin", "doaj_publish_push", journal=journal).value
             if journal_enabled:
@@ -42,6 +45,7 @@ def index(request):
             issue_type__code="issue",
             journal=request.journal,
             articles__stage=sm_models.STAGE_PUBLISHED,
+            articles__date_published__isnull=False,
         ).annotate(
             count_articles=Count("articles"),
         ).filter(
@@ -62,6 +66,7 @@ def index(request):
     return render(request, template, context)
 
 
+@editor_user_required
 def configure(request):
     token = setting_handler.get_setting(
         "plugin", "doaj_api_token", journal=request.journal)
@@ -144,3 +149,24 @@ def configure(request):
     }
 
     return render(request, template, context)
+
+@require_POST
+@editor_user_required
+def push_issue(request):
+    issue_id = request.POST.get("issue_id")
+    issue = get_object_or_404(journal_models.Issue,
+        id=issue_id,
+        journal=request.journal,
+    )
+    errors = logic.push_issue_to_doaj(issue, raise_on_error=False)
+    if errors:
+        messages.add_message(
+            request, messages.ERROR,
+            "Failed to push %d articles" % len(errors),
+        )
+    else:
+        messages.add_message(
+            request, messages.SUCCESS,
+            "%s articles pushed to DOAJ" % issue.articles.count(),
+        )
+    return redirect(request.META.get("HTTP_REFERER"))
