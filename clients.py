@@ -195,7 +195,6 @@ class BaseDOAJClient(object):
         except Exception:
             if settings.DEBUG:
                 logger.debug("Failed to decode JSON")
-                import pdb; pdb.set_trace()  # XXX BREAKPOINT
                 raise
             else:
                 raise
