@@ -9,7 +9,6 @@ from plugins.doaj_transporter import clients, logic, synch
 
 
 class Command(BaseCommand):
-    """ Imports back content from target UP Journal"""
 
     help = "Pushes articles to DOAJ for given journal, issue or articles list"
 
