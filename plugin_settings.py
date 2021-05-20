@@ -4,7 +4,7 @@ from utils import models
 from utils.install import update_settings
 from plugins.doaj_transporter import events as plugin_events
 
-PLUGIN_NAME = 'doaj_transporter'
+PLUGIN_NAME = 'DOAJ Transporter'
 DESCRIPTION = 'A plugin for exporting metadata to DOAJ via their API'
 AUTHOR = 'Mauro Sanchez'
 VERSION = '1.0'
