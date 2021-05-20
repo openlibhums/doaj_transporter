@@ -45,7 +45,15 @@ def index(request):
 
     issues = []
     if request.journal:
-        issues = journal_models.Issue.objects.filter(
+        issues_with_articles = journal_models.Issue.objects.filter(
+            issue_type__code="issue",
+            journal=request.journal,
+            articles__stage=sm_models.STAGE_PUBLISHED,
+            articles__date_published__isnull=False,
+        ).annotate(
+            count_doaj=Count("articles"),
+        )
+        issues_with_doaj_ids = journal_models.Issue.objects.filter(
             issue_type__code="issue",
             journal=request.journal,
             articles__stage=sm_models.STAGE_PUBLISHED,
@@ -54,6 +62,10 @@ def index(request):
         ).annotate(
             count_doaj=Count("articles__identifier"),
         )
+
+        # MSL: This trickery is done to  force a LEFT OUTER JOIN on articles
+        issues = issues_with_doaj_ids | issues_with_articles.exclude(
+            pk__in=issues_with_doaj_ids)
 
 
     template = 'doaj_transporter/index.html'
