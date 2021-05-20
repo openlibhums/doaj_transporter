@@ -69,8 +69,8 @@ def delete_article_from_doaj(doaj_id):
     :param doaj_id: identifiers.models.Identifier
     """
     if check_debug_settings():
-        article_client = clients.DOAJArticle.from_doaj_id(
-            doaj_id.identifier)
+        article_client = clients.DOAJArticle.from_article_model(
+            doaj_id.article)
         article_client.delete()
         doaj_id.delete()
     else:

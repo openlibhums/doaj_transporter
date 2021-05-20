@@ -173,6 +173,7 @@ class BaseDOAJClient(object):
             tb.print_exc()
             raise exceptions.RequestFailed(
                 "DOAJ unreachable at: " % url)
+        return response
 
 
     def _build_url(self, querystring, **path_args):

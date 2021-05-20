@@ -45,13 +45,9 @@ def index(request):
 
     issues = []
     if request.journal:
-        issues_with_articles = journal_models.Issue.objects.filter(
+        issues = journal_models.Issue.objects.filter(
             issue_type__code="issue",
             journal=request.journal,
-            articles__stage=sm_models.STAGE_PUBLISHED,
-            articles__date_published__isnull=False,
-        ).annotate(
-            count_doaj=Count("articles"),
         )
         issues_with_doaj_ids = journal_models.Issue.objects.filter(
             issue_type__code="issue",
@@ -64,7 +60,7 @@ def index(request):
         )
 
         # MSL: This trickery is done to  force a LEFT OUTER JOIN on articles
-        issues = issues_with_doaj_ids | issues_with_articles.exclude(
+        issues = issues_with_doaj_ids | issues.exclude(
             pk__in=issues_with_doaj_ids)
 
 
@@ -198,10 +194,10 @@ def push_article(request):
     except Exception as e:
         messages.add_message(
             request, messages.ERROR,
-            "Push failed: %s" % e,
+            "Push failed: %s" % e.__class__.__name__,
         )
         logger.error("[DOAJ] Error pushing article %s to doaj:", article.pk)
-        logger.error("[DOAJ] %s", e)
+        logger.error("[DOAJ] %s(%s)", e.__class__.__name__, e)
     else:
         messages.add_message(
             request, messages.SUCCESS,
