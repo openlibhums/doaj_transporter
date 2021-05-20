@@ -118,9 +118,9 @@ def synch_article_from_janeway(article):
             logger.debug("Searching DOAJ with DOI %s" % doi)
             doaj_id = next(results).id
             doaj_id, created = Identifier.objects.get_or_create(
-                article=doi.article,
+                article=article,
                 id_type="doaj",
-                identifier=search_result.id,
+                identifier=doaj_id,
             )
             if created:
                 logger.info("New DOAJ record for article %s ", article.pk)

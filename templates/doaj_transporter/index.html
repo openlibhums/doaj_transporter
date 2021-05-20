@@ -93,7 +93,7 @@
                           <span>
                             {{ issue }}
                             <span class="badge badge-{% if issue.count_doaj < issue.count_articles %}warning{% else %}primary{% endif %} badge-pill">
-                                {{ issue.count_doaj }}/{{ issue.count_articles }}
+                                {{ issue.count_doaj }}/{{ issue.articles.count }}
                             </span>
                           </span>
                           <span>

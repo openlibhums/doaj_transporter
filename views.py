@@ -50,9 +50,6 @@ def index(request):
             journal=request.journal,
             articles__stage=sm_models.STAGE_PUBLISHED,
             articles__date_published__isnull=False,
-        ).annotate(
-            count_articles=Count("articles"),
-        ).filter(
             articles__identifier__id_type="doaj",
         ).annotate(
             count_doaj=Count("articles__identifier"),
