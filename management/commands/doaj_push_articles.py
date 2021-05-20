@@ -48,5 +48,3 @@ class Command(BaseCommand):
                     self.stderr.write("[%s] Failed to push:" % article.pk)
                     err = e
                     tb.print_exc()
-
-

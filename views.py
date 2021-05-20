@@ -197,7 +197,7 @@ def push_article(request):
             "Push failed: %s" % e.__class__.__name__,
         )
         logger.error("[DOAJ] Error pushing article %s to doaj:", article.pk)
-        logger.error("[DOAJ] %s(%s)", e.__class__.__name__, e)
+        logger.exception("[DOAJ] %s(%s)", e.__class__.__name__, e)
     else:
         messages.add_message(
             request, messages.SUCCESS,

@@ -167,12 +167,12 @@ class BaseDOAJClient(object):
                 "DOAJ request timed out" % attempts)
         except requests.exceptions.ConnectionError as e:
             raise exceptions.RequestFailed(
-                "DOAJ unreachable at: " % url)
+                "DOAJ unreachable at: %s" % url)
         except requests.exceptions.RequestException as e:
             logger.error("Unexpected error from DOAJ")
             tb.print_exc()
             raise exceptions.RequestFailed(
-                "DOAJ unreachable at: " % url)
+                "DOAJ unreachable at: %s" % url)
         return response
 
 
@@ -223,6 +223,9 @@ class BaseDOAJClient(object):
         if response.status_code == 401:
             raise exceptions.InvalidDOAJToken(
                 response.request.url)
+        if response.status_code == 400:
+            raise exceptions.BadRequest(
+                response.text)
         response.raise_for_status()
 
     @staticmethod

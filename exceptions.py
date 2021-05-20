@@ -16,3 +16,7 @@ class ImmutableFieldChanged(Exception):
     While it is not documented, we've seen this happening when attempting to
     update the URL or identifier for an article.
     """
+    pass
+
+class BadRequest(Exception):
+    pass
