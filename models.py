@@ -41,6 +41,7 @@ class Article(sm_models.Article):
         return (
             self.date_published
             and self.stage == sm_models.STAGE_PUBLISHED
+            and self.get_doi()
         )
 
     def latest_deposit(self):
