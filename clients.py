@@ -396,7 +396,9 @@ class DOAJArticle_v1(BaseDOAJClient):
         return AuthorStruct(
             name=author.full_name(),
             affiliation=author.affiliation(),
-            orcid_id=author.orcid or None,
+            orcid_id=(
+                "https://orcid.org/%s" % author.orcid if author.orcid else None
+            ),
         )
 
     @staticmethod
