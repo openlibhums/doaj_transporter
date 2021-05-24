@@ -2,10 +2,9 @@ import time
 import traceback as tb
 
 from django.core.management.base import BaseCommand
-from submission.models import Article
+from submission.models import Article, STAGE_PUBLISHED
 
 from plugins.doaj_transporter import clients, logic, synch
-
 
 
 class Command(BaseCommand):
@@ -30,13 +29,15 @@ class Command(BaseCommand):
         if articles.count() < 1:
             self.stderr.write("No articles found with given parameters")
 
-        for article in articles:
+        for article in articles.filter(
+            stage=STAGE_PUBLISHED,
+            date_publised__isnull=False,
+        ):
             print("[%s] Handling article %s" % (article.pk, article))
             doi = article.get_doi()
             if doi:
                 # If we have a DOI check if article has been synched first
                 synch.synch_article_from_janeway(article)
-            doaj_article = clients.DOAJArticle.from_article_model(article)
             if options["dry_run"]:
                 print(logic.encode_to_doaj_json(article))
             else:
