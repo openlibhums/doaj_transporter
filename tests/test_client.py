@@ -71,7 +71,7 @@ class TestDOAJArticleClient(TestCase):
                 {
                     "name":"Testla Musketeer",
                     "affiliation":"OLH",
-                    "orcid_id": null
+                    "orcid_id": "https://orcid.org/0000-0000-0000-0000"
                 }
             ],
             "journal":{
@@ -119,6 +119,7 @@ class TestDOAJArticleClient(TestCase):
         article.save()
 
         author = helpers.create_user("author@doaj.com")
+        author.orcid = "0000-0000-0000-0000"
         author.first_name = "Testla"
         author.last_name = "Musketeer"
         author.institution = "OLH"

@@ -238,6 +238,10 @@ class DOAJArticle_v1(BaseDOAJClient):
     OP_PATH = "/articles/{article_id}"
     SCHEMA = schemas.ArticleSchema
     VERBS = {"GET", "POST", "PUT", "DELETE"}
+    # There is a limit to how many keywords can be submitted per article
+    # {"status": "bad_request", "error": "bibjson.keywords may only contain a
+    # maximum of 6 keywords (ref: 383e725e-bcb4-11eb-91b5-6ac132d54a90)"}
+    MAX_KEYWORDS = 6
 
     __slots__ = [
         # Admin
@@ -284,7 +288,10 @@ class DOAJArticle_v1(BaseDOAJClient):
         doaj_article.author = [
             cls.transform_author(a) for a in article.authors.all()]
         doaj_article.journal = cls.transform_journal(article)
-        doaj_article.keywords = [kw.word for kw in article.keywords.all()]
+        doaj_article.keywords = [
+            kw.word
+            for kw in article.keywords.all()[:cls.MAX_KEYWORDS]
+        ]
         doaj_article.link = cls.transform_urls(article)
         doaj_article.identifier = cls.transform_identifiers(article)
         doaj_article.id = article.get_identifier("doaj")
