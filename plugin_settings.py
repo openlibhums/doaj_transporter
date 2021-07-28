@@ -45,6 +45,7 @@ def install():
 def register_for_events():
     return plugin_events.register_for_events()
 
+
 def hook_registry():
     # On site load, the load function is run for each installed plugin to
     # generate a list of hooks.

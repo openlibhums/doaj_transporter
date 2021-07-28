@@ -44,7 +44,6 @@ class TestDOAJArticleClient(TestCase):
         self.journal.code = "doaj"
         self.journal.save()
 
-        install.update_license(self.journal, management_command=False)
         install.update_settings(
             self.journal, file_path=SETTINGS_PATH)
 
