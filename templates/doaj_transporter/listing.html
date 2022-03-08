@@ -40,7 +40,7 @@
                                 </td>
                                 <td>
                                     {% if request.user.is_staff %}
-                                    <a class="small button" href="{% url 'admin:doaj_transporter_doajdeposit_changelist' %}?article__id__exact=article.pk" target="_blank">Admin logs</a>
+                                    <a class="small button" href="{% url 'admin:doaj_transporter_doajdeposit_changelist' %}?article__id__exact={{ article.pk }}" target="_blank">Admin logs</a>
                                     {% endif %}
                                     {% if article.can_push %}
                                     <a class="small button" href="{% url 'doaj_article_json' article.pk %}" target="_blank">View JSON</a>
