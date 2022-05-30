@@ -400,12 +400,17 @@ class DOAJArticle_v1(BaseDOAJClient):
 
     @staticmethod
     def transform_author(author):
+        if author.orcid and author.orcid.startswith(
+            'https://orcid.org/'
+        ):
+            orcid_string = author.orcid
+        else:
+            orcid_string = "https://orcid.org/%s" % author.orcid if author.orcid else None
+
         return AuthorStruct(
             name=author.full_name(),
             affiliation=author.affiliation(),
-            orcid_id=(
-                "https://orcid.org/%s" % author.orcid if author.orcid else None
-            ),
+            orcid_id=orcid_string,
         )
 
     @staticmethod
