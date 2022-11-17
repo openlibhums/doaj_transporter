@@ -59,6 +59,7 @@ def push_issue_to_doaj(issue, raise_on_error=True):
                 tb.print_exc()
     return errors
 
+
 def encode_article_to_doaj_json(article):
     article_client = clients.DOAJArticle.from_article_model(article)
     return article_client.encode()
