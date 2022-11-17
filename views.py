@@ -1,6 +1,6 @@
 from django.db.models import Count
 from django.contrib import messages
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import HttpResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, render, redirect
