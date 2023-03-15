@@ -30,8 +30,7 @@ class Command(BaseCommand):
             self.stderr.write("No articles found with given parameters")
 
         for article in articles.filter(
-            stage=STAGE_PUBLISHED,
-            date_publised__isnull=False,
+
         ):
             print("[%s] Handling article %s" % (article.pk, article))
             doi = article.get_doi()
@@ -39,7 +38,7 @@ class Command(BaseCommand):
                 # If we have a DOI check if article has been synched first
                 synch.synch_article_from_janeway(article)
             if options["dry_run"]:
-                print(logic.encode_to_doaj_json(article))
+                print(logic.encode_article_to_doaj_json(article))
             else:
                 try:
                     logic.push_article_to_doaj(article)
