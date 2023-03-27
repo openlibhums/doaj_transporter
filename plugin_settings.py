@@ -7,11 +7,11 @@ from plugins.doaj_transporter import events as plugin_events
 PLUGIN_NAME = 'DOAJ Transporter'
 DESCRIPTION = 'A plugin for exporting metadata to DOAJ via their API'
 AUTHOR = 'Mauro Sanchez'
-VERSION = '1.1'
+VERSION = '1.2'
 SHORT_NAME = 'doaj_transporter'
 DISPLAY_NAME = 'DOAJ Transporter'
 MANAGER_URL = 'doaj_index'
-JANEWAY_VERSION = '1.4.0'
+JANEWAY_VERSION = '1.5.0'
 
 
 PLUGIN_PATH = os.path.dirname(os.path.realpath(__file__))
