@@ -20,9 +20,11 @@ def check_debug_settings():
     return True
 
 
-def push_article_to_doaj(article):
+def push_article_to_doaj(article, force_delete=False):
     """ Updates or creates a record in DOAJ for the given article
     :param article: submission.models.Article
+    :param force_delete: Requests to delete existing record when URLs differ
+    :type force_delete: bool
     """
     doi = article.get_identifier("doi")
     if not doi:
@@ -38,14 +40,21 @@ def push_article_to_doaj(article):
     return encoded
 
 
-def push_issue_to_doaj(issue, raise_on_error=True):
+def push_issue_to_doaj(issue, raise_on_error=True, force_delete=False):
+    """ Updates or creates a record in DOAJ for publised articles in the issue
+    :param issue: journal.models.Issue
+    :param raise_on_error: Raise an exception if any request fails
+    :type raise_on_error: bool
+    :param force_delete: Requests to delete existing records when URLs differ
+    :type force_delete: bool
+    """
     errors = {}
     for article in issue.articles.filter(
         stage=sm_models.STAGE_PUBLISHED,
     ):
         if article.date_published:
             try:
-                push_article_to_doaj(article)
+                push_article_to_doaj(article, force_delete=force_delete)
                 logger.info("Sleeping thread for 200ms")
                 time.sleep(0.2)
             except Exception as e:

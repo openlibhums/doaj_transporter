@@ -15,9 +15,11 @@ class Command(BaseCommand):
         parser.add_argument('--issue_id', '-i')
         parser.add_argument('--journal_code', '-j')
         parser.add_argument('--article_ids', '-a,', nargs="+", type=int)
+        parser.add_argument('--force_delete', action="store_true", default=False)
         parser.add_argument('--dry_run', action="store_true", default=False)
 
     def handle(self, *args, **options):
+        force_delete = options["force_delete"]
         articles = Article.objects.none()
         if options.get("journal_code"):
             articles |= Article.objects.filter(journal__code=options["journal_code"])
@@ -41,7 +43,7 @@ class Command(BaseCommand):
                 print(logic.encode_article_to_doaj_json(article))
             else:
                 try:
-                    logic.push_article_to_doaj(article)
+                    logic.push_article_to_doaj(article, force_delete=force_delete)
                     print("Sleeping thread for 200ms")
                     time.sleep(0.2)
                 except Exception as e:
