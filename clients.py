@@ -372,7 +372,7 @@ class DOAJArticle_v1(BaseDOAJClient):
 
     def error_handler(self, response):
         if response.status_code == 404 and self.id:
-            return self._handler_404(response)
+            return self._handle_404(response)
         elif response.status_code == 403 and self.id:
             return self._handle_403(response)
         return super().error_handler(response)
