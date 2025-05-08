@@ -39,7 +39,7 @@ class TestDOAJArticleClient(TestCase):
         press = helpers.create_press()
         self.journal, _ = helpers.create_journals()
         self.journal.save()
-        call_command('load_default_settings', management_command=False)
+        call_command('load_default_settings')
         self.journal.publisher = "doaj"
         self.journal.code = "doaj"
         self.journal.save()
@@ -123,7 +123,7 @@ class TestDOAJArticleClient(TestCase):
         author.last_name = "Musketeer"
         author.institution = "OLH"
         author.save()
-        article.authors.add(author)
+        author.snapshot_self(article=article)
         article.owner = author
 
         issue = Issue.objects.create(
@@ -152,7 +152,6 @@ class TestDOAJArticleClient(TestCase):
         )
         article.galley_set.add(pdf_galley)
         article.save()
-        article.snapshot_authors(article)
         return article
 
     @override_settings(DOAJ_API_TOKEN="dummy_key")
