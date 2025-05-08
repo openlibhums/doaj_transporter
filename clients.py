@@ -286,7 +286,8 @@ class DOAJArticle_v1(BaseDOAJClient):
         doaj_article.year = int(article.date_published.year)
         doaj_article.month = int(article.date_published.month)
         doaj_article.author = [
-            cls.transform_author(a) for a in article.authors.all()]
+            cls.transform_author(a) for a in article.frozen_authors()
+        ]
         doaj_article.journal = cls.transform_journal(article)
         doaj_article.keywords = [
             kw.word
