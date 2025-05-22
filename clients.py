@@ -416,13 +416,13 @@ class DOAJArticle_v1(BaseDOAJClient):
             links.append(LinkStruct(
                 content_type="text/html",
                 type="fulltext",
-                url=article.url,
+                url={% if article.is_remote and article.remote_url %}{{ article.remote_url }}{% else %}{{ article.url }}{% endif %},
             ))
         if article.pdfs:
             links.append(LinkStruct(
                 content_type="application/pdf",
                 type="fulltext",
-                url=article.pdf_url,
+                url={% if article.is_remote and article.remote_url %}{{ article.remote_url }}{% else %}{{ article.pdf_url }}{% endif %},
             ))
 
         return links
