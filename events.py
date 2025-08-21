@@ -36,7 +36,7 @@ def push_on_publication(article, *args, **kwargs):
 
 def register_for_events():
     events_logic.Events.register_for_event(
-        events_logic.ON_ARTICLE_PUBLISHED,
+        events_logic.Events.ON_ARTICLE_PUBLISHED,
         push_on_publication,
     )
 
