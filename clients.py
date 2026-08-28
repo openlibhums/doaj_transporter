@@ -164,7 +164,7 @@ class BaseDOAJClient(object):
                     self._decode(response.text)
         except requests.exceptions.Timeout:
             raise exceptions.RequestFailed(
-                "DOAJ request timed out" % attempts)
+                "DOAJ request timed out")
         except requests.exceptions.ConnectionError as e:
             raise exceptions.RequestFailed(
                 "DOAJ unreachable at: %s" % url)
@@ -342,6 +342,16 @@ class DOAJArticle_v1(BaseDOAJClient):
             if force_delete:
                 self.delete()
                 self.upsert()
+            raise
+        except exceptions.RequestFailed as e:
+            # The request never reached DOAJ so there is no response to log,
+            # but the failure still belongs in the article's deposit history
+            models.DOAJDeposit.objects.create(
+                article=self.janeway_article,
+                identifier=getattr(self, "id", None),
+                success=False,
+                result_text=str(e),
+            )
             raise
 
     def delete(self):
