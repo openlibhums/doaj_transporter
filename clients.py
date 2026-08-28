@@ -115,7 +115,7 @@ class BaseDOAJClient(object):
             url = self._build_url(querystring, **path_vars)
             if headers is None:
                 headers = {}
-            headers = {'Content-type': 'application/json'}.update(headers)
+            headers = {'Content-type': 'application/json', **headers}
             return self._fetch(url, session().put,
                 body=self.encode(), headers=headers, decode=False)
         else:
@@ -127,7 +127,7 @@ class BaseDOAJClient(object):
             url = self._build_url(querystring, **path_vars)
             if headers is None:
                 headers = {}
-            headers = {'Content-type': 'application/json'}.update(headers)
+            headers = {'Content-type': 'application/json', **headers}
             return self._fetch(
                 url, session().post, body=self.encode(), headers=headers)
         else:
@@ -138,7 +138,7 @@ class BaseDOAJClient(object):
             url = self._build_url(querystring, **path_vars)
             if headers is None:
                 headers = {}
-            headers = {'Content-type': 'application/json'}.update(headers)
+            headers = {'Content-type': 'application/json', **headers}
             return self._fetch(
                 url, session().delete, body=self.encode(),
                 headers=headers, decode=False,
@@ -376,6 +376,8 @@ class BaseDOAJArticle(BaseDOAJClient):
             return self._handle_404(response)
         elif response.status_code == 403 and self.id:
             return self._handle_403(response)
+        elif response.status_code == 400:
+            return self._handle_400(response)
         return super().error_handler(response)
 
     def _handle_404(self, response):
@@ -393,6 +395,22 @@ class BaseDOAJArticle(BaseDOAJClient):
         logger.warning("Received 404 on %s" % response.request.url)
         self.id = None
         raise exceptions.ResultNotFound(response.request.url)
+
+    def _handle_400(self, response):
+        # DOAJ rejected the payload. The rejection is raised from within
+        # _fetch, before upsert can log it, so the deposit is recorded here
+        # in order to keep DOAJ's explanation of the rejection
+        article = getattr(self, "janeway_article", None)
+        if article:
+            models.DOAJDeposit.objects.create(
+                article=article,
+                identifier=getattr(self, "id", None),
+                success=False,
+                result_text=response.text,
+            )
+        logger.warning("Received 400 on %s: %s" % (
+            response.request.url, response.text))
+        raise exceptions.BadRequest(response.text)
 
     def _handle_403(self, response):
         # It is not documented but we see 403: forbidden when the article

@@ -1,4 +1,5 @@
 import datetime
+import json
 from unittest import mock
 
 from core import models as core_models
@@ -15,15 +16,26 @@ from submission.models import FrozenAuthor
 from utils.testing import helpers
 from utils import install
 
+from plugins.doaj_transporter import exceptions
+from plugins.doaj_transporter import models as doaj_models
 from plugins.doaj_transporter.clients import DOAJArticle, ArticleSearchClient
 
 SETTINGS_PATH = "plugins/doaj_transporter/install/settings.json"
 
+BAD_REQUEST_BODY = (
+    '{"status": "bad_request", "error": "bibjson.keywords may only contain '
+    'a maximum of 6 keywords (ref: 383e725e-bcb4-11eb-91b5-6ac132d54a90)"}'
+)
+
 
 class MockResponse(mock.Mock):
-    def __init__(self, content=None, ok=True):
+    def __init__(self, content=None, ok=True, status_code=200,
+                 url="https://doaj.org/api/v2/articles", **kwargs):
+        super().__init__(**kwargs)
         self.content = content or ""
         self._ok = ok
+        self.status_code = status_code
+        self.request = mock.Mock(url=url)
 
     @property
     def text(self):
@@ -33,6 +45,9 @@ class MockResponse(mock.Mock):
     def ok(self):
         return self._ok
 
+    def json(self):
+        return json.loads(self.content)
+
 
 class TestDOAJArticleClient(TestCase):
     def setUp(self):
@@ -40,6 +55,7 @@ class TestDOAJArticleClient(TestCase):
         self.journal, _ = helpers.create_journals()
         self.journal.save()
         call_command('load_default_settings')
+        helpers.create_roles(["author"])
         self.journal.publisher = "doaj"
         self.journal.code = "doaj"
         self.journal.save()
@@ -108,7 +124,6 @@ class TestDOAJArticleClient(TestCase):
             }
         }
         """ % (self.article.pk)
-
     def _create_article(self, **kwargs):
         kwargs.setdefault("abstract", "The test abstract")
         kwargs.setdefault("title", "The art of writing test titles")
@@ -208,6 +223,74 @@ class TestDOAJArticleClient(TestCase):
                 id_type="doaj",
                 identifier="test",
             )
+
+    def test_insert_article_bad_request_is_logged(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.return_value = MockResponse(
+            BAD_REQUEST_BODY, ok=False, status_code=400)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.BadRequest):
+                doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertEqual(deposit.result_text, BAD_REQUEST_BODY)
+
+    def test_update_article_bad_request_is_logged(self):
+        id_models.Identifier.objects.create(
+            article=self.article,
+            id_type="doaj",
+            identifier="test",
+        )
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.put.return_value = MockResponse(
+            BAD_REQUEST_BODY, ok=False, status_code=400)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.BadRequest):
+                doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertEqual(deposit.identifier, "test")
+        self.assertEqual(deposit.result_text, BAD_REQUEST_BODY)
+
+    def test_upsert_sends_content_type_header(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.return_value = MockResponse(
+            BAD_REQUEST_BODY, ok=False, status_code=400)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.BadRequest):
+                doaj_article.upsert()
+
+        _, kwargs = mock_session.post.call_args
+        self.assertEqual(
+            kwargs["headers"], {"Content-type": "application/json"})
+
+    def test_bad_request_without_janeway_article(self):
+        # Clients built from a DOAJ id have no article to log against
+        mock_session = mock.MagicMock()
+        mock_session.get.return_value = MockResponse(
+            BAD_REQUEST_BODY, ok=False, status_code=400)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.BadRequest):
+                DOAJArticle.from_doaj_id("test", "dummy_key")
+
+        self.assertFalse(doaj_models.DOAJDeposit.objects.exists())
 
     @override_settings(DOAJ_API_TOKEN="dummy_key")
     def test_decode_article(self):
