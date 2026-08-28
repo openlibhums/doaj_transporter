@@ -55,8 +55,9 @@ def push_issue_to_doaj(issue, raise_on_error=True, force_delete=False):
         if article.date_published:
             try:
                 push_article_to_doaj(article, force_delete=force_delete)
-                logger.info("Sleeping thread for 200ms")
-                time.sleep(0.2)
+                logger.info(
+                    "Sleeping thread for %ss", clients.API_THROTTLE_SECS)
+                time.sleep(clients.API_THROTTLE_SECS)
             except Exception as e:
                 if raise_on_error:
                     raise

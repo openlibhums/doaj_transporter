@@ -33,8 +33,10 @@ _local = threading.local()
 
 RETRY_ATTEMPTS = 5
 RETRY_BACKOFF_FACTOR = 0.2
-RETRY_ON_STATUS = [502, 503, 504, 429],
+RETRY_ON_STATUS = [502, 503, 504, 429]
 RETRY_METHODS = {'DELETE', 'GET', 'HEAD', 'PUT', 'POST'}
+# DOAJ rate-limits API clients to around 2 requests per second
+API_THROTTLE_SECS = 0.5
 
 
 def session():
@@ -47,9 +49,15 @@ def session():
             total=RETRY_ATTEMPTS,
             backoff_factor=RETRY_BACKOFF_FACTOR,
             status_forcelist=RETRY_ON_STATUS,
-            method_whitelist=RETRY_METHODS,
+            allowed_methods=RETRY_METHODS,
+            # Hand back the final response when retries are exhausted so
+            # error_handler can report the real status instead of RetryError
+            raise_on_status=False,
         )
-        _session.mount('http://', HTTPAdapter(max_retries=retry))
+        adapter = HTTPAdapter(max_retries=retry)
+        # DOAJ is served over https, so mounting http alone retried nothing
+        _session.mount('http://', adapter)
+        _session.mount('https://', adapter)
         _local.session = _session
         return session()
 
@@ -226,7 +234,12 @@ class BaseDOAJClient(object):
         if response.status_code == 400:
             raise exceptions.BadRequest(
                 response.text)
-        response.raise_for_status()
+        # DOAJ answered, so this is not a transport failure. raise_for_status
+        # would raise an HTTPError, which _fetch catches as a RequestException
+        # and rebrands "DOAJ unreachable", discarding the status and the body
+        raise exceptions.RequestFailed(
+            "DOAJ returned %s for %s: %s" % (
+                response.status_code, response.request.url, response.text))
 
     @staticmethod
     def get_token_from_settings(journal=None):
@@ -515,7 +528,7 @@ class BaseSearchClient(BaseDOAJClient):
     SEARCH_QUERY_PREFIX = ""
     SCHEMA = schemas.SearchSchema
     VERBS= {"GET"}
-    THROTTLE_SECS = 0.250
+    THROTTLE_SECS = API_THROTTLE_SECS
     PAGE_SIZE = 50
 
     __slots__ = ["results", "next", "previous", "last"]

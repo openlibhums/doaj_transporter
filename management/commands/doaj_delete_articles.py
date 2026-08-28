@@ -40,8 +40,8 @@ class Command(BaseCommand):
                 else:
                     try:
                         logic.delete_article_from_doaj(doaj_id)
-                        print("Sleeping thread for 200ms")
-                        time.sleep(0.2)
+                        print("Sleeping thread for %ss" % clients.API_THROTTLE_SECS)
+                        time.sleep(clients.API_THROTTLE_SECS)
                     except Exception as e:
                         self.stderr.write("[%s] Failed to delete:" % article.pk)
                         err = e

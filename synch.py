@@ -40,8 +40,8 @@ def synch_all_from_doaj(journal=None):
                 results = search_client.search_by_eissn(j.issn)
                 for result in results:
                     created = synch_result_from_doaj(result)
-            logger.info("Sleeping thread for 200ms")
-            time.sleep(0.2)
+            logger.info("Sleeping thread for %ss", clients.API_THROTTLE_SECS)
+            time.sleep(clients.API_THROTTLE_SECS)
         else:
             logger.info("No API token for journal: %s" % j)
 
@@ -94,8 +94,9 @@ def synch_all_from_janeway(journal=None, push=False):
                 obj, c = synch_article_from_janeway(article)
                 if push:
                     logic.push_article_to_doaj(article)
-                logger.info("Thread Sleeping for 200ms")
-                time.sleep(0.20)
+                logger.info(
+                    "Thread Sleeping for %ss", clients.API_THROTTLE_SECS)
+                time.sleep(clients.API_THROTTLE_SECS)
 
 
 def synch_article_from_janeway(article):

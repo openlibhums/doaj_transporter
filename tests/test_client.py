@@ -18,6 +18,7 @@ from submission.models import FrozenAuthor
 from utils.testing import helpers
 from utils import install
 
+from plugins.doaj_transporter import clients
 from plugins.doaj_transporter import exceptions
 from plugins.doaj_transporter import models as doaj_models
 from plugins.doaj_transporter.clients import DOAJArticle, ArticleSearchClient
@@ -27,6 +28,11 @@ SETTINGS_PATH = "plugins/doaj_transporter/install/settings.json"
 BAD_REQUEST_BODY = (
     '{"status": "bad_request", "error": "bibjson.keywords may only contain '
     'a maximum of 6 keywords (ref: 383e725e-bcb4-11eb-91b5-6ac132d54a90)"}'
+)
+
+RATE_LIMIT_BODY = (
+    '{"status": "too_many_requests", "error": "rate limit exceeded, '
+    'retry after 60 seconds"}'
 )
 
 
@@ -242,6 +248,28 @@ class TestDOAJArticleClient(TestCase):
         self.assertFalse(deposit.success)
         self.assertEqual(deposit.result_text, BAD_REQUEST_BODY)
 
+    def test_insert_article_rate_limited_is_logged(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.return_value = MockResponse(
+            RATE_LIMIT_BODY, ok=False, status_code=429)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.RequestFailed) as raised:
+                doaj_article.upsert()
+
+        # DOAJ answered, so the status and body must survive the exception
+        self.assertIn("429", str(raised.exception))
+        self.assertIn(RATE_LIMIT_BODY, str(raised.exception))
+        self.assertNotIn("unreachable", str(raised.exception))
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertIn("429", deposit.result_text)
+        self.assertIn(RATE_LIMIT_BODY, deposit.result_text)
+
     def test_update_article_bad_request_is_logged(self):
         id_models.Identifier.objects.create(
             article=self.article,
@@ -333,6 +361,27 @@ class TestDOAJArticleClient(TestCase):
             print(a,b, c)
         self.assertEqual(expected, result)
 
+
+
+class TestSession(TestCase):
+    def test_retries_are_mounted_for_https(self):
+        # DOAJ is served over https, so an adapter mounted only on http
+        # would leave every real request unretried
+        adapter = clients.session().get_adapter("https://doaj.org/api/v4/")
+        self.assertIn(429, adapter.max_retries.status_forcelist)
+        self.assertIn(502, adapter.max_retries.status_forcelist)
+
+    def test_retries_cover_the_verbs_the_clients_use(self):
+        adapter = clients.session().get_adapter("https://doaj.org/api/v4/")
+        self.assertEqual(
+            clients.RETRY_METHODS, set(adapter.max_retries.allowed_methods))
+
+    def test_exhausted_retries_return_the_response(self):
+        # With raise_on_status urllib3 would raise MaxRetryError instead,
+        # which requests turns into RetryError and _fetch mislabels as
+        # "DOAJ unreachable", hiding the real status from error_handler
+        adapter = clients.session().get_adapter("https://doaj.org/api/v4/")
+        self.assertFalse(adapter.max_retries.raise_on_status)
 
 
 class TestArticleSearch(TestCase):
