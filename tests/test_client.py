@@ -57,6 +57,13 @@ class MockResponse(mock.Mock):
         return json.loads(self.content)
 
 
+class SimplejsonMockResponse(MockResponse):
+    # When simplejson is installed requests raises its JSONDecodeError,
+    # which is a ValueError but not the stdlib json.JSONDecodeError
+    def json(self):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+
 class TestDOAJArticleClient(TestCase):
     def setUp(self):
         press = helpers.create_press()
@@ -340,6 +347,43 @@ class TestDOAJArticleClient(TestCase):
         deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
         self.assertFalse(deposit.success)
         self.assertIn("timed out", deposit.result_text)
+
+    def test_update_with_empty_response_body_succeeds(self):
+        # A successful DOAJ update returns 204 with no body; parsing it
+        # must not turn a successful push into a reported failure
+        id_models.Identifier.objects.create(
+            article=self.article,
+            id_type="doaj",
+            identifier="test",
+        )
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.put.return_value = SimplejsonMockResponse(
+            "", ok=True, status_code=204)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertTrue(deposit.success)
+
+    def test_non_json_error_response_is_validated(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.return_value = SimplejsonMockResponse(
+            "<html>Bad gateway</html>", ok=False, status_code=502)
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.RequestFailed):
+                doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertIn("502", deposit.result_text)
 
     def test_bad_request_without_janeway_article(self):
         # Clients built from a DOAJ id have no article to log against

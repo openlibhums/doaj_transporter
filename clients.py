@@ -1,4 +1,3 @@
-from json import JSONDecodeError
 import threading
 import time
 
@@ -160,12 +159,22 @@ class BaseDOAJClient(object):
                 url, data=body, headers=headers,
                 timeout=self.TIMEOUT_SECS,
             )
+            logger.info(
+                "DOAJ responded %s with %s bytes",
+                response.status_code, len(response.content or b""),
+            )
 
+            # ValueError covers every flavour of JSON decode error: the
+            # stdlib's, simplejson's and the requests compat class, which
+            # subclasses RequestException and json errors from whichever
+            # json provider requests detected at import time
             try:
                 logger.debug(response.json())
-            except JSONDecodeError:
-                logger.warning("Received non-JSON response from DOAJ:")
-                logger.warning(response.text or '""')
+            except ValueError:
+                if response.content:
+                    logger.warning("Received non-JSON response from DOAJ:")
+                    logger.warning(response.text)
+                self._validate_response(response)
             else:
                 if self._validate_response(response) and decode:
                     self._decode(response.text)
