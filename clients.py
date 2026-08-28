@@ -1,7 +1,6 @@
 from json import JSONDecodeError
 import threading
 import time
-import traceback as tb
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -170,17 +169,18 @@ class BaseDOAJClient(object):
             else:
                 if self._validate_response(response) and decode:
                     self._decode(response.text)
-        except requests.exceptions.Timeout:
+        except requests.exceptions.Timeout as e:
+            logger.exception("DOAJ request timed out")
             raise exceptions.RequestFailed(
-                "DOAJ request timed out")
+                "DOAJ request timed out: %s" % e)
         except requests.exceptions.ConnectionError as e:
+            logger.exception("DOAJ connection error")
             raise exceptions.RequestFailed(
-                "DOAJ unreachable at: %s" % url)
+                "DOAJ unreachable at: %s (%s)" % (url, e))
         except requests.exceptions.RequestException as e:
-            logger.error("Unexpected error from DOAJ")
-            tb.print_exc()
+            logger.exception("Unexpected error from DOAJ")
             raise exceptions.RequestFailed(
-                "DOAJ unreachable at: %s" % url)
+                "DOAJ request failed for %s: %s" % (url, e))
         return response
 
 

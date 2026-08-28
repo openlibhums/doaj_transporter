@@ -311,7 +311,8 @@ class TestDOAJArticleClient(TestCase):
     def test_insert_article_connection_error_is_logged(self):
         doaj_article = DOAJArticle.from_article_model(self.article)
         mock_session = mock.MagicMock()
-        mock_session.post.side_effect = requests.exceptions.ConnectionError
+        mock_session.post.side_effect = requests.exceptions.ConnectionError(
+            "Name or service not known")
         with mock.patch(
             "plugins.doaj_transporter.clients.session",
             return_value=mock_session,
@@ -322,6 +323,8 @@ class TestDOAJArticleClient(TestCase):
         deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
         self.assertFalse(deposit.success)
         self.assertIn("DOAJ unreachable", deposit.result_text)
+        # The underlying error must survive into the deposit record
+        self.assertIn("Name or service not known", deposit.result_text)
 
     def test_insert_article_timeout_is_logged(self):
         doaj_article = DOAJArticle.from_article_model(self.article)
