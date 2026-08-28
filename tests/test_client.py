@@ -2,6 +2,8 @@ import datetime
 import json
 from unittest import mock
 
+import requests
+
 from core import models as core_models
 from django.conf import settings
 from django.core.management import call_command
@@ -277,6 +279,36 @@ class TestDOAJArticleClient(TestCase):
         _, kwargs = mock_session.post.call_args
         self.assertEqual(
             kwargs["headers"], {"Content-type": "application/json"})
+
+    def test_insert_article_connection_error_is_logged(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.side_effect = requests.exceptions.ConnectionError
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.RequestFailed):
+                doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertIn("DOAJ unreachable", deposit.result_text)
+
+    def test_insert_article_timeout_is_logged(self):
+        doaj_article = DOAJArticle.from_article_model(self.article)
+        mock_session = mock.MagicMock()
+        mock_session.post.side_effect = requests.exceptions.Timeout
+        with mock.patch(
+            "plugins.doaj_transporter.clients.session",
+            return_value=mock_session,
+        ):
+            with self.assertRaises(exceptions.RequestFailed):
+                doaj_article.upsert()
+
+        deposit = doaj_models.DOAJDeposit.objects.get(article=self.article)
+        self.assertFalse(deposit.success)
+        self.assertIn("timed out", deposit.result_text)
 
     def test_bad_request_without_janeway_article(self):
         # Clients built from a DOAJ id have no article to log against
