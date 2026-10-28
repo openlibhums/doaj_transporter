@@ -22,6 +22,7 @@ SETTINGS_PATH = "plugins/doaj_transporter/install/settings.json"
 
 class MockResponse(mock.Mock):
     def __init__(self, content=None, ok=True):
+        super().__init__()
         self.content = content or ""
         self._ok = ok
 
@@ -37,6 +38,7 @@ class MockResponse(mock.Mock):
 class TestDOAJArticleClient(TestCase):
     def setUp(self):
         press = helpers.create_press()
+        helpers.create_roles(["author"])
         self.journal, _ = helpers.create_journals()
         self.journal.save()
         call_command('load_default_settings')
